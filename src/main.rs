@@ -18,6 +18,7 @@ async fn main() -> Result<(), rocket::Error> {
     let _rocket = rocket::build()
         .configure(config::from_env())
         .manage_db()
+        .mount_uploads()
         .mount_static_files()
         .mount_catchers()
         .mount_auth_routes()
