@@ -231,7 +231,7 @@ pub fn api_get_files(db: &State<Connection>, cookies: &CookieJar<'_>) -> Value {
         )
         .load::<File>(&mut *conn)
     {
-        Ok(files) => json!(files.into_iter().map(|f| f.name).collect::<Vec<String>>()),
+        Ok(files) => json!(files),
         Err(e) => ApiError::from_error(&e).to_json(),
     }
 }
