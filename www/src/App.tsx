@@ -1,13 +1,24 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 import { getData, postData } from "./utils/utils";
+import LoginForm from "./components/LoginForm";
+import RegisterForm from "./components/RegisterForm";
+import FileUploadForm from "./components/FileUploadForm";
+import ImagesMasonry from "./components/ImagesMasonry";
 
 window.delbnt = false;
 
+export interface IFile {
+  id: string;
+  name: string;
+  private: boolean;
+  user_id: string;
+}
+
 function App() {
   const [msg, setMsg] = useState("");
-  const [files, setFiles] = useState([]);
-  const [imgSrc, setImgSrc] = useState("");
+  const [files, setFiles] = useState<IFile[]>([]);
+  const [needUpdate, setNeedUpdate] = useState(0);
 
   useEffect(() => {}, [window.delbnt]);
 
@@ -16,61 +27,22 @@ function App() {
       <div className="card">
         {/* <pre style={{ textAlign: "left" }}>{msg}</pre> */}
         <div className="flex flex-row gap-2">
-          <form
-            className="create-user-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              postData("/api/register", {
-                username: e.target.username.value,
-                password: e.target.password.value,
-              }).then((data) => {
-                console.log(data);
-              });
-            }}
-          >
-            <h1>Register</h1>
-            <label htmlFor="username">Username</label>
-            <input type="text" name="username" id="username" />
-            <label htmlFor="password">Password</label>
-            <input type="password" name="password" id="password" />
-            <button type="submit">Register</button>
-          </form>
-          <form
-            className="flex flex-col p-5"
-            onSubmit={(e) => {
-              e.preventDefault();
-              postData("/api/login", {
-                username: e.target.login_username.value,
-                password: e.target.login_password.value,
-              }).then((data) => {
-                console.log(data);
-              });
-            }}
-          >
-            <h1>Login</h1>
-            <label htmlFor="login_username">Username</label>
-            <input type="text" name="login_username" id="login_username" />
-            <label htmlFor="login_password">Password</label>
-            <input type="password" name="login_password" id="login_password" />
-            <button type="submit">Login</button>
-          </form>
+          <RegisterForm />
+          <LoginForm />
         </div>
         <button onClick={() => postData("/api/logout", {})}>Logout</button>
 
         {files &&
           files.map((file) => (
-            <div key={file}>
-              <a href={`/api/file/${file}`}>{file}</a>
+            <div key={file.name}>
+              <a href={`/uploads/${file.name}`}>{file.name}</a>
               {window.delbnt && (
                 <button
                   className="ml-2 px-2 py-1 bg-red-500 text-white rounded-md"
                   onClick={() => {
-                    fetch(`/api/file/${file}`, { method: "DELETE" });
+                    fetch(`/api/file/${file.name}`, { method: "DELETE" });
                     getData("/api/files")
-                      .then((res) => {
-                        if (res.error_msg) {
-                          throw new Error(res.error_msg);
-                        }
+                      .then((res: IFile[]) => {
                         console.log(res);
                         setMsg(JSON.stringify(res, null, 2));
                         setFiles(res);
@@ -99,38 +71,9 @@ function App() {
         >
           Get all files
         </button>
+        <ImagesMasonry />
 
-        <form
-          className="upload-form"
-          encType="multipart/form-data"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const target = e.target as HTMLFormElement;
-            const formData = new FormData(target);
-            formData.append("file", target.file.files[0]);
-            formData.append("filename", target.filename.value);
-            formData.append("is_private", target.is_private.checked);
-            fetch("/api/file/create", {
-              method: "POST",
-              body: formData,
-            })
-              .then((res) => res.json())
-              .then((res) => console.log(res));
-          }}
-        >
-          <label htmlFor="file">File</label>
-          <input type="file" name="file" id="file" />
-          <label htmlFor="filename">Filename</label>
-          <input type="text" name="filename" id="filename" />
-          <label htmlFor="is_private">Private</label>
-          <input
-            type="checkbox"
-            name="is_private"
-            id="is_private"
-            defaultChecked={true}
-          />
-          <input type="submit" value="Submit" />
-        </form>
+        <FileUploadForm />
       </div>
     </>
   );
