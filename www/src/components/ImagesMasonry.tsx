@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import { getData } from "../utils/utils";
 import { IFile } from "../App";
+import { masonryNeedsUpdate } from "../store";
+import { useAtom } from "jotai";
 
 export default function ImagesMasonry() {
   const [images, setImages] = useState<string[]>([]);
+  const [needsUpdate] = useAtom(masonryNeedsUpdate);
+
   useEffect(() => {
     getData("/api/files")
       .then((res) => {
@@ -15,7 +19,7 @@ export default function ImagesMasonry() {
       .catch((error) => {
         console.error(error);
       });
-  }, []);
+  }, [needsUpdate]);
 
   return (
     <div>
@@ -26,7 +30,7 @@ export default function ImagesMasonry() {
             <img
               src={image}
               key={image}
-              className="w-full h-auto rounded-xl shadow"
+              className="w-full h-auto rounded-xl shadow hover:-translate-y-1 hover:scale-105 transition-all duration-200"
             />
           ))}
       </div>

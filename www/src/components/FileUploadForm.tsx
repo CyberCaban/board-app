@@ -1,9 +1,12 @@
 import { useRef, useState } from "react";
+import { masonryNeedsUpdate } from "../store";
+import { useAtom } from "jotai";
 
 export default function FileUploadForm() {
   const fileInput = useRef<HTMLInputElement>(null);
   const [filename, setFilename] = useState<string>("");
   const [isPrivate, setIsPrivate] = useState<boolean>(false);
+  const [, setNeedsUpdate] = useAtom(masonryNeedsUpdate);
 
   const handleFileChange = () => {
     if (fileInput.current?.files?.length === 0) return;
@@ -29,6 +32,10 @@ export default function FileUploadForm() {
       .then((data) => {
         setFilename("");
         console.log(data);
+        setNeedsUpdate((prev) => {
+          console.log(prev);
+          return prev + 1;
+        });
         if (!fileInput.current) return;
         fileInput.current.value = "";
       })
