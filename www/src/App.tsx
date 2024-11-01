@@ -5,6 +5,8 @@ import LoginForm from "./components/LoginForm";
 import RegisterForm from "./components/RegisterForm";
 import FileUploadForm from "./components/FileUploadForm";
 import ImagesMasonry from "./components/ImagesMasonry";
+import { useAtom } from "jotai";
+import { masonryNeedsUpdate } from "./store";
 
 window.delbnt = false;
 
@@ -18,7 +20,6 @@ export interface IFile {
 function App() {
   const [msg, setMsg] = useState("");
   const [files, setFiles] = useState<IFile[]>([]);
-  const [needUpdate, setNeedUpdate] = useState(0);
 
   useEffect(() => {}, [window.delbnt]);
 
