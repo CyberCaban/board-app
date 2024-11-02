@@ -1,9 +1,12 @@
-import {  useState } from "react";
+import { useState } from "react";
 import { postData } from "../utils/utils";
+import { masonryNeedsUpdate } from "../store";
+import { useAtom } from "jotai";
 
 export default function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [, setNeedsUpdate] = useAtom(masonryNeedsUpdate);
   const Form = (
     <form
       className="create-user-form"
@@ -12,8 +15,9 @@ export default function LoginForm() {
         postData("/api/login", {
           username: username,
           password: password,
-        }).then((data) => {
-          console.log(data);
+        }).then((res) => {
+          console.log(res);
+          setNeedsUpdate((prev) => prev + 1);
         });
       }}
     >
@@ -37,9 +41,5 @@ export default function LoginForm() {
       <button type="submit">Login</button>
     </form>
   );
-  return (
-    <div>
-      {Form}
-    </div>
-  );
+  return <div>{Form}</div>;
 }
