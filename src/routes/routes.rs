@@ -7,8 +7,8 @@ use serde_json::{json, Value};
 
 use crate::database::Connection;
 use crate::errors::{ApiError, LoginError, RegisterError};
-use crate::models::User;
 use crate::models;
+use crate::models::User;
 use crate::schema::users::{self, dsl::*};
 
 #[derive(serde::Deserialize)]
@@ -32,32 +32,18 @@ pub fn api_hello_post(msg: Json<Msg<'_>>) -> Value {
     json!({"msg": format!("Hello, {}!", msg.msg)})
 }
 
-#[get("/get_users")]
-pub fn api_get_users(db: &State<Connection>) -> Value {
-    use self::models::User;
-    let mut conn = match db.get() {
-        Ok(c) => c,
-        Err(e) => return ApiError::from_error(&e).to_json(),
-    };
-    let res = users.load::<User>(&mut *conn);
-    match res {
-        Ok(result) => json!(result),
-        Err(e) => ApiError::from_error(&e).to_json(),
-    }
-}
-
 #[post("/register", format = "json", data = "<user>")]
 pub fn api_register(
     db: &State<Connection>,
     user: Json<NewUser<'_>>,
     cookies: &CookieJar<'_>,
-) -> Result<Json<User>, Value> {
+) -> Result<Json<User>, Json<Value>> {
     use self::models::User;
     use crate::schema;
 
     let mut conn = match db.get() {
         Ok(c) => c,
-        Err(e) => return Err(json!(ApiError::from_error(&e))),
+        Err(e) => return Err(ApiError::from_error(&e).to_json()),
     };
     match users
         .filter(users::username.eq(user.username.to_lowercase()))
@@ -95,18 +81,17 @@ pub fn api_login(
     db: &State<Connection>,
     user: Json<NewUser<'_>>,
     cookies: &CookieJar<'_>,
-) -> Result<Json<User>, Value> {
+) -> Result<Json<User>, Json<Value>> {
     use self::models::User;
     let mut conn = match db.get() {
         Ok(c) => c,
-        Err(e) => return Err(json!(ApiError::from_error(&e))),
+        Err(e) => return Err(ApiError::from_error(&e).to_json()),
     };
     let usrs = users
         .filter(users::username.eq(user.username))
         .first::<User>(&mut *conn);
     println!("{:?}", &usrs);
-    match usrs
-    {
+    match usrs {
         Err(_) => Err(ApiError::new("UserNotFound", LoginError::UserNotFound).to_json()),
         Ok(usr) => {
             if usr.password != user.password {
