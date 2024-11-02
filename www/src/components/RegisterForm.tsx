@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { postData } from "../utils/utils";
+import { masonryNeedsUpdate } from "../store";
+import { useAtom } from "jotai";
 
 export default function RegisterForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [, setNeedsUpdate] = useAtom(masonryNeedsUpdate);
   return (
     <div>
       <form
@@ -13,8 +16,9 @@ export default function RegisterForm() {
           postData("/api/register", {
             username: username,
             password: password,
-          }).then((data) => {
-            console.log(data);
+          }).then((res) => {
+            console.log(res);
+            setNeedsUpdate((prev) => prev + 1);
           });
         }}
       >
