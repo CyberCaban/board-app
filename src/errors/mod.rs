@@ -1,3 +1,4 @@
+use rocket::serde::json::Json;
 use serde_json::{json, Value};
 
 #[derive(serde::Serialize)]
@@ -34,8 +35,8 @@ impl ApiError {
             error_msg: error_msg.to_string(),
         }
     }
-    pub fn to_json(&self) -> Value {
-        json!(self)
+    pub fn to_json(&self) -> Json<Value> {
+        Json(json!(self))
     }
 }
 

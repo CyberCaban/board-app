@@ -20,7 +20,7 @@ macro_rules! connect_db {
     ($db:expr) => {
         match $db.get() {
             Ok(c) => c,
-            Err(e) => return ApiError::from_error(&e).to_json(),
+            Err(e) => return Err(ApiError::from_error(&e).to_json()),
         }
     };
 }

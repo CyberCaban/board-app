@@ -10,7 +10,6 @@ impl AuthorizationRoutes for Rocket<Build> {
             routes![
                 routes::api_hello,
                 routes::api_hello_post,
-                routes::api_get_users,
                 routes::api_register,
                 file_routes::api_upload_file,
                 file_routes::api_get_file,
