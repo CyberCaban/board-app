@@ -29,8 +29,4 @@ RUN diesel --help
 
 RUN cargo build --release
 
-ENV ROCKET_ADDRESS=0.0.0.0
-ENV PORT=5000
-EXPOSE 5000
-
 CMD diesel migration run && cargo run --release
