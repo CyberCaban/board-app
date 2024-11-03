@@ -3,3 +3,6 @@
 
 ./www/dist
 ./www/node_modules
+
+./tmp/*
+!./tmp/.gitkeep
