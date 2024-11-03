@@ -37,16 +37,37 @@ Prerequisites:
 - [Node.js](https://nodejs.org/en/)
 - [Docker](https://www.docker.com) (optional)
 
-### With Docker
+### With Docker 
 
 ```bash
-docker build -t web-app .
-docker run -p 8000:8000 web-app -e DATABASE_URL=`your_database_url`
+docker-compose up
 ```
+
+Wait until you see line: "Rocket has launched from http://0.0.0.0:8080"
+
+You can now access the server at http://localhost:8080
 
 ### Without Docker
 
-Build frontend inside the `www` folder:
+1. Create .env file with .env.local as example and put your database credentials there.
+It should look like this:
+
+```
+PORT=8080 # required
+ROCKET_ADDRESS=0.0.0.0 # required do not use 127.0.0.1
+DATABASE_URL=postgres://username:password@localhost:5432/database_name # required
+```
+
+2. You should run the database server
+
+3. Run database migrations
+
+```bash
+cargo install diesel_cli --no-default-features --features postgres
+diesel migration run
+```
+
+4. Build frontend inside the `www` folder:
 
 ```bash
 cd www
@@ -54,11 +75,13 @@ npm install
 npm run build
 ```
 
-Start the server:
+5. Start the server:
 
 ```bash
 cargo run --release
 ```
+
+You can now access the server at http://localhost:PORT where PORT is the port you specified in .env file.
 
 ## References
 
