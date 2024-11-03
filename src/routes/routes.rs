@@ -22,16 +22,6 @@ pub struct NewUser<'a> {
     password: &'a str,
 }
 
-#[get("/hello")]
-pub fn api_hello() -> Value {
-    json!("Hello, World!")
-}
-
-#[post("/hello", format = "json", data = "<msg>")]
-pub fn api_hello_post(msg: Json<Msg<'_>>) -> Value {
-    json!({"msg": format!("Hello, {}!", msg.msg)})
-}
-
 #[post("/register", format = "json", data = "<user>")]
 pub fn api_register(
     db: &State<Connection>,
@@ -41,12 +31,17 @@ pub fn api_register(
     use self::models::User;
     use crate::schema;
 
+    let user = NewUser {
+        username: &user.username.trim(),
+        password: &user.password.trim(),
+    };
+
     let mut conn = match db.get() {
         Ok(c) => c,
         Err(e) => return Err(ApiError::from_error(&e).to_json()),
     };
     match users
-        .filter(users::username.eq(user.username.to_lowercase()))
+        .filter(users::username.eq(user.username))
         .first::<User>(&mut *conn)
     {
         Ok(_) => {
@@ -83,6 +78,12 @@ pub fn api_login(
     cookies: &CookieJar<'_>,
 ) -> Result<Json<User>, Json<Value>> {
     use self::models::User;
+
+    let user = NewUser {
+        username: &user.username.trim(),
+        password: &user.password.trim(),
+    };
+
     let mut conn = match db.get() {
         Ok(c) => c,
         Err(e) => return Err(ApiError::from_error(&e).to_json()),
@@ -90,7 +91,6 @@ pub fn api_login(
     let usrs = users
         .filter(users::username.eq(user.username))
         .first::<User>(&mut *conn);
-    println!("{:?}", &usrs);
     match usrs {
         Err(_) => Err(ApiError::new("UserNotFound", LoginError::UserNotFound).to_json()),
         Ok(usr) => {
