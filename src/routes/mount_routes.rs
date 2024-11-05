@@ -8,8 +8,6 @@ impl AuthorizationRoutes for Rocket<Build> {
         self.mount(
             "/api",
             routes![
-                routes::api_hello,
-                routes::api_hello_post,
                 routes::api_register,
                 file_routes::api_upload_file,
                 file_routes::api_get_file,
