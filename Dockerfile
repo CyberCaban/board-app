@@ -13,7 +13,5 @@ RUN diesel --help
 
 COPY . ./
 RUN cargo build --release
-RUN cp target/release/web-app /app
-RUN rm -rf target
 
-CMD diesel migration run && /app/web-app
+CMD diesel migration run && cargo run --release

@@ -61,3 +61,7 @@ button:focus-visible {
 form {
   @apply flex flex-col gap-2
 }
+
+input, textarea {
+  @apply text-black
+}
