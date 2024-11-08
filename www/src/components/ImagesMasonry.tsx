@@ -1,12 +1,10 @@
+"use client";
 import { useEffect, useState } from "react";
 import { deleteData, getData } from "../utils/utils";
-import { IFile } from "../App";
-import { masonryNeedsUpdate } from "../store";
-import { useAtom } from "jotai";
+import { IFile } from "@/types";
 
 export default function ImagesMasonry() {
   const [images, setImages] = useState<string[]>([]);
-  const [needsUpdate] = useAtom(masonryNeedsUpdate);
 
   useEffect(() => {
     getData("/api/files").then((res) => {
@@ -18,7 +16,7 @@ export default function ImagesMasonry() {
         })
       );
     });
-  }, [needsUpdate]);
+  }, []);
 
   const handleDelete = (image: string) => {
     const filename = image.split("/").pop()!;

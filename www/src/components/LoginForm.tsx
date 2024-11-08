@@ -1,15 +1,12 @@
+"use client";
 import { useState } from "react";
 import { postData } from "../utils/utils";
-import { masonryNeedsUpdate } from "../store";
-import { useAtom } from "jotai";
 
 export default function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [, setNeedsUpdate] = useAtom(masonryNeedsUpdate);
   const Form = (
     <form
-      className="create-user-form"
       onSubmit={(e) => {
         e.preventDefault();
         postData("/api/login", {
@@ -17,7 +14,6 @@ export default function LoginForm() {
           password: password,
         }).then((res) => {
           console.log(res);
-          setNeedsUpdate((prev) => prev + 1);
         });
       }}
     >
