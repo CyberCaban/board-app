@@ -43,9 +43,7 @@ Prerequisites:
 docker-compose up
 ```
 
-Wait until you see line: "Rocket has launched from http://0.0.0.0:8080"
-
-You can now access the server at http://localhost:8080
+You can now access the server at http://localhost:3000
 
 ### Without Docker
 
