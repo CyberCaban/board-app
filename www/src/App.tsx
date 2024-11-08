@@ -18,7 +18,7 @@ function App() {
   const [, setNeedsUpdate] = useAtom(masonryNeedsUpdate);
   return (
     <>
-      <div className="card">
+      <main>
         <div className="flex flex-row gap-2">
           <RegisterForm />
           <LoginForm />
@@ -44,7 +44,7 @@ function App() {
         </button>
         <ImagesMasonry />
         <FileUploadForm />
-      </div>
+      </main>
     </>
   );
 }
