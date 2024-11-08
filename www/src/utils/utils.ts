@@ -1,5 +1,5 @@
 export async function postData(url: string, data: unknown) {
-  return fetch(url, {
+  return fetch(`${url}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

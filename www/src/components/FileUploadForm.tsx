@@ -1,12 +1,10 @@
+"use client";
 import { useRef, useState } from "react";
-import { masonryNeedsUpdate } from "../store";
-import { useAtom } from "jotai";
 
 export default function FileUploadForm() {
   const fileInput = useRef<HTMLInputElement>(null);
   const [filename, setFilename] = useState<string>("");
   const [isPrivate, setIsPrivate] = useState<boolean>(false);
-  const [, setNeedsUpdate] = useAtom(masonryNeedsUpdate);
 
   const handleFileChange = () => {
     if (fileInput.current?.files?.length === 0) return;
@@ -18,7 +16,7 @@ export default function FileUploadForm() {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!fileInput.current?.files?.length) return;
+    if (!fileInput.current || !fileInput.current?.files?.length) return;
     const file = fileInput.current.files?.[0];
     const formData = new FormData();
     formData.append("file", file);
@@ -32,11 +30,7 @@ export default function FileUploadForm() {
       .then((data) => {
         setFilename("");
         console.log(data);
-        setNeedsUpdate((prev) => {
-          return prev + 1;
-        });
-        if (!fileInput.current) return;
-        fileInput.current.value = "";
+        if (fileInput.current) fileInput.current.value = "";
       })
       .catch((error) => {
         console.error(error);
@@ -45,6 +39,7 @@ export default function FileUploadForm() {
 
   return (
     <form className="upload-form" onSubmit={handleSubmit}>
+      <h1>Upload File</h1>
       <input type="file" ref={fileInput} onChange={handleFileChange} />
       <input
         type="text"

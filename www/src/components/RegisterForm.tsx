@@ -1,16 +1,13 @@
+"use client";
 import { useState } from "react";
 import { postData } from "../utils/utils";
-import { masonryNeedsUpdate } from "../store";
-import { useAtom } from "jotai";
 
 export default function RegisterForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [, setNeedsUpdate] = useAtom(masonryNeedsUpdate);
   return (
-    <div>
+    <>
       <form
-        className="create-user-form"
         onSubmit={(e) => {
           e.preventDefault();
           postData("/api/register", {
@@ -18,7 +15,6 @@ export default function RegisterForm() {
             password: password,
           }).then((res) => {
             console.log(res);
-            setNeedsUpdate((prev) => prev + 1);
           });
         }}
       >
@@ -41,6 +37,6 @@ export default function RegisterForm() {
         />
         <button type="submit">Register</button>
       </form>
-    </div>
+    </>
   );
 }
