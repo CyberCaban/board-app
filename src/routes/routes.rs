@@ -11,11 +11,6 @@ use crate::models;
 use crate::models::User;
 use crate::schema::users::{self, dsl::*};
 
-#[derive(serde::Deserialize)]
-pub struct Msg<'a> {
-    msg: &'a str,
-}
-
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NewUser<'a> {
     username: &'a str,

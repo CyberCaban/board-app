@@ -19,7 +19,7 @@ async fn main() -> Result<(), rocket::Error> {
         .configure(config::from_env())
         .manage_db()
         .mount_uploads()
-        .mount_static_files()
+        // .mount_static_files()
         .mount_catchers()
         .mount_auth_routes()
         .launch()
