@@ -31,6 +31,10 @@ pub fn api_register(
         password: &user.password.trim(),
     };
 
+    if user.username.is_empty() {
+        return Err(ApiError::new("EmptyUsername", RegisterError::EmptyUsername).to_json());
+    }
+
     let mut conn = match db.get() {
         Ok(c) => c,
         Err(e) => return Err(ApiError::from_error(&e).to_json()),

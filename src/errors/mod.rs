@@ -48,6 +48,7 @@ enum ApiResponse {
 
 #[derive(serde::Serialize)]
 pub enum RegisterError {
+    EmptyUsername,
     UserAlreadyExists,
     WeakPassword,
 }
@@ -56,6 +57,7 @@ impl ToString for RegisterError {
         match self {
             RegisterError::UserAlreadyExists => "UserAlreadyExists".to_string(),
             RegisterError::WeakPassword => "WeakPassword".to_string(),
+            RegisterError::EmptyUsername => "EmptyUsername".to_string(),
         }
     }
 }
