@@ -33,7 +33,6 @@ export default function FileUploadForm() {
         setFilename("");
         console.log(data);
         setNeedsUpdate((prev) => {
-          console.log(prev);
           return prev + 1;
         });
         if (!fileInput.current) return;
@@ -61,7 +60,7 @@ export default function FileUploadForm() {
           onChange={(e) => setIsPrivate(e.target.checked)}
         />
       </label>
-      <button type="submit">Upload</button>
+      <button type="submit">Upload File</button>
     </form>
   );
 }

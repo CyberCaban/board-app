@@ -34,10 +34,9 @@ export default function ImagesMasonry() {
       <div className="columns-4 md:columns-6 gap-4 space-y-4">
         {images &&
           images.map((image) => (
-            <div className="w-full h-auto relative group">
+            <div className="w-full h-auto relative group" key={image}>
               <a
                 href={image}
-                key={image}
                 target="_blank"
                 className=""
                 rel="noopener noreferrer"
