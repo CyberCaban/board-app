@@ -1,4 +1,17 @@
 services:
+  frontend:
+    build: ./www
+    ports:
+      - 3000:4173
+    environment:
+      VITE_API_BASE_URL: http://web-app:5000
+    develop:
+      watch:
+        - action: rebuild
+          path: ./www
+    depends_on:
+      - web-app
+
   web-app:
     build: ./
     ports:
@@ -7,16 +20,16 @@ services:
       DATABASE_URL: postgresql://postgres:123456@postgres-db:5432
       PORT: 5000
       ROCKET_ADDRESS: 0.0.0.0
-    depends_on:
-      - postgres-db
     volumes:
       - tmp:/app/tmp
+    depends_on:
+      - postgres-db
 
   postgres-db:
-    image: postgres
+    image: postgres:17.0
     restart: always
     ports:
-      - "5432:5432"
+      - 5432:5432
     environment:
       POSTGRES_DB: postgres_db
       POSTGRES_USER: postgres
