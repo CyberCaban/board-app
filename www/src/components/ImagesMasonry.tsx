@@ -2,14 +2,15 @@
 import { useEffect, useState } from "react";
 import { deleteData, getData } from "../utils/utils";
 import { IFile } from "@/types";
+import Image from "next/image";
 
 export default function ImagesMasonry() {
-  const [images, setImages] = useState<string[]>([]);
+  const [imagesURL, setImagesURL] = useState<string[]>([]);
 
   useEffect(() => {
     getData("/api/files").then((res) => {
       console.log("getData", res);
-      setImages(
+      setImagesURL(
         res.map((file: IFile) => {
           if (file.private) return `/uploads/${file.user_id}/${file.name}`;
           return `/uploads/${file.name}`;
@@ -21,7 +22,7 @@ export default function ImagesMasonry() {
   const handleDelete = (image: string) => {
     const filename = image.split("/").pop()!;
     deleteData(`/api/file/${filename}`).then((res) => {
-      setImages(images.filter((img) => img !== image));
+      setImagesURL(imagesURL.filter((img) => img !== image));
       console.log(res);
     });
   };
@@ -30,8 +31,8 @@ export default function ImagesMasonry() {
     <div>
       <h1>Images</h1>
       <div className="columns-4 md:columns-6 gap-4 space-y-4">
-        {images &&
-          images.map((image) => (
+        {imagesURL &&
+          imagesURL.map((image) => (
             <div className="w-full h-auto relative group" key={image}>
               <a
                 href={image}
@@ -39,9 +40,13 @@ export default function ImagesMasonry() {
                 className=""
                 rel="noopener noreferrer"
               >
-                <img
+                <Image
                   src={image}
-                  className="w-full h-full rounded-xl shadow group-hover:-translate-y-1 hover:scale-105 transition-all duration-200"
+                  alt="Uploaded Image"
+                  loading="lazy"
+                  width={500}
+                  height={500}
+                  className="rounded-xl shadow group-hover:-translate-y-1 hover:scale-105 transition-all duration-200"
                 />
               </a>
               <button

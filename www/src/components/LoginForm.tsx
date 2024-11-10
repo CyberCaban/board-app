@@ -1,10 +1,12 @@
 "use client";
 import { useState } from "react";
 import { postData } from "../utils/utils";
+import { useUserStore } from "@/providers/userProvider";
 
 export default function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const { setUser } = useUserStore((state) => state);
   const Form = (
     <form
       onSubmit={(e) => {
@@ -14,6 +16,7 @@ export default function LoginForm() {
           password: password,
         }).then((res) => {
           console.log(res);
+          setUser(res);
         });
       }}
     >
