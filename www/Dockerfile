@@ -9,7 +9,7 @@ RUN node -v
 
 WORKDIR /app
 COPY ./package.json ./package-lock.json ./
-RUN npm install
+RUN npm install --force
 ARG NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 
