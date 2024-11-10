@@ -1,36 +1,82 @@
+import { postData } from "@/utils/utils";
+import { toast } from "sonner";
 import { createStore } from "zustand";
-import { persist } from "zustand/middleware";
+import { devtools, persist, subscribeWithSelector } from "zustand/middleware";
 
-export type User = {
-  token: string;
+export type TUser = {
+  id: string;
   username: string;
   profile_url: string;
 };
 
 export type UserActions = {
-  setUser: (user: User) => void;
+  register: (username: string, password: string) => void;
+  login: (username: string, password: string) => void;
+  logout: () => void;
+  setUser: (user: TUser) => void;
   resetUser: () => void;
 };
 
-export type UserStore = User & UserActions;
+export type UserStore = TUser & UserActions;
 
-export const defaultUser: User = {
-  token: "",
+export const initUserStore = (): TUser => ({
+  id: "",
+  username: "",
+  profile_url: "",
+});
+
+export const defaultUser: TUser = {
+  id: "",
   username: "",
   profile_url: "",
 };
 
-export const createUserStore = (user: User = defaultUser) => {
-  return createStore<UserStore>()(
-    persist(
-      (set) => ({
-        ...user,
-        setUser: (user: User) => set(user),
-        resetUser: () => set(defaultUser),
-      }),
-      {
-        name: "user",
-      }
+export const createUserStore = (user: TUser = defaultUser) => {
+  const store = createStore<UserStore>()(
+    subscribeWithSelector(
+      persist(
+        devtools((set) => ({
+          ...user,
+          register: (username: string, password: string) => {
+            postData("/api/register", { username, password })
+              .then((res: TUser) => {
+                set({
+                  id: res.id,
+                  username: res.username,
+                  profile_url: res.profile_url,
+                });
+                toast.success("User registered successfully");
+              })
+              .catch((err) => toast.error(err.message));
+          },
+          login: (username: string, password: string) => {
+            postData("/api/login", { username, password })
+              .then((res: TUser) => {
+                set({
+                  id: res.id,
+                  username: res.username,
+                  profile_url: res.profile_url,
+                });
+                toast.success("User logged in successfully");
+              })
+              .catch((err) => toast.error(err.message));
+          },
+          logout: () => {
+            postData("/api/logout", {}).then(() => {
+              set(defaultUser);
+              toast.success("User logged out");
+            });
+          },
+          setUser: (user: TUser) => set(user),
+          resetUser: () => set(defaultUser),
+        })),
+        {
+          name: "user",
+        }
+      )
     )
   );
+
+  store.subscribe(() => {});
+  return store;
 };
