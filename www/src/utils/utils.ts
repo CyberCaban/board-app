@@ -15,6 +15,37 @@ export async function postData(url: string, data: unknown) {
     });
 }
 
+export async function postFormData(url: string, data: FormData) {
+  return fetch(`${url}`, {
+    method: "POST",
+    body: data,
+  })
+    .then((response) => response.json())
+    .then((res) => {
+      if (res.error_msg) {
+        throw new Error(res.error_msg);
+      }
+      return res;
+    });
+}
+
+export async function putData(url: string, data: unknown) {
+  return fetch(`${url}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  })
+    .then((response) => response.json())
+    .then((res) => {
+      if (res.error_msg) {
+        throw new Error(res.error_msg);
+      }
+      return res;
+    });
+}
+
 export async function getData(url: string) {
   return fetch(url)
     .then((response) => response.json())

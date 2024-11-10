@@ -1,32 +1,15 @@
 "use client";
-import { useEffect, useState } from "react";
-import { deleteData, getData } from "../utils/utils";
-import { IFile } from "@/types";
 import Image from "next/image";
 
-export default function ImagesMasonry() {
-  const [imagesURL, setImagesURL] = useState<string[]>([]);
+interface MasonryImageProps {
+  imagesURL: string[];
+  handleDelete: (id: string) => void;
+}
 
-  useEffect(() => {
-    getData("/api/files").then((res) => {
-      console.log("getData", res);
-      setImagesURL(
-        res.map((file: IFile) => {
-          if (file.private) return `/uploads/${file.user_id}/${file.name}`;
-          return `/uploads/${file.name}`;
-        })
-      );
-    });
-  }, []);
-
-  const handleDelete = (image: string) => {
-    const filename = image.split("/").pop()!;
-    deleteData(`/api/file/${filename}`).then((res) => {
-      setImagesURL(imagesURL.filter((img) => img !== image));
-      console.log(res);
-    });
-  };
-
+export default function ImagesMasonry({
+  imagesURL,
+  handleDelete,
+}: MasonryImageProps) {
   return (
     <div>
       <h1>Images</h1>

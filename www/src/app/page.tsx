@@ -1,5 +1,5 @@
-import FileUploadForm from "@/components/FileUploadForm";
-import ImagesMasonry from "@/components/ImagesMasonry";
+"use client";
+import ImagesAndUpload from "@/components/ImagesPage";
 import Navbar from "@/components/Navbar";
 
 export default function Home() {
@@ -7,8 +7,7 @@ export default function Home() {
     <>
       <Navbar />
       <main className="flex min-h-screen flex-col items-center p-24">
-        <FileUploadForm />
-        <ImagesMasonry />
+        <ImagesAndUpload />
       </main>
     </>
   );

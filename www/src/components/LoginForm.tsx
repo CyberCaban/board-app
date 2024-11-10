@@ -1,25 +1,19 @@
 "use client";
 import { useState } from "react";
-import { postData } from "../utils/utils";
 import { useUserStore } from "@/providers/userProvider";
 
 export default function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const { setUser } = useUserStore((state) => state);
-  const Form = (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        postData("/api/login", {
-          username: username,
-          password: password,
-        }).then((res) => {
-          console.log(res);
-          setUser(res);
-        });
-      }}
-    >
+  const [state] = useUserStore((state) => state);
+
+  const login = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    state.login(username, password);
+  };
+
+  return (
+    <form onSubmit={login}>
       <h1>Login</h1>
       <label htmlFor="loginUsername">Username</label>
       <input
@@ -40,5 +34,4 @@ export default function LoginForm() {
       <button type="submit">Login</button>
     </form>
   );
-  return <div>{Form}</div>;
 }
