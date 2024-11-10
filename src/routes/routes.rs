@@ -56,6 +56,8 @@ pub fn api_register(
                 id: uuid::Uuid::new_v4(),
                 username: user.username.to_string(),
                 password: user.password.to_string(),
+                profile_url: None,
+                bio: None,
             };
             if let Err(e) = diesel::insert_into(schema::users::table)
                 .values(&new_user)

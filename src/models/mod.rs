@@ -7,6 +7,8 @@ pub struct User {
     pub id: uuid::Uuid,
     pub username: String,
     pub password: String,
+    pub profile_url: Option<String>,
+    pub bio: Option<String>,
 }
 
 #[derive(Insertable, Queryable, Selectable, Serialize, Deserialize)]
