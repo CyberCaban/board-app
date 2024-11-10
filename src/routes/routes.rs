@@ -9,12 +9,22 @@ use crate::database::Connection;
 use crate::errors::{ApiError, LoginError, RegisterError};
 use crate::models;
 use crate::models::User;
+use crate::schema::files::user_id;
 use crate::schema::users::{self, dsl::*};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NewUser<'a> {
     username: &'a str,
     password: &'a str,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct UpdateUser<'a> {
+    username: &'a str,
+    old_password: &'a str,
+    new_password: &'a str,
+    profile_url: &'a str,
+    bio: &'a str,
 }
 
 #[post("/register", format = "json", data = "<user>")]
@@ -102,6 +112,67 @@ pub fn api_login(
                 Ok(Json(usr))
             }
         }
+    }
+}
+
+#[put("/user", format = "json", data = "<new_user>")]
+pub fn api_update_user(
+    db: &State<Connection>,
+    new_user: Json<UpdateUser<'_>>,
+    cookies: &CookieJar<'_>,
+) -> Result<Json<User>, Json<Value>> {
+    use self::models::User;
+    use uuid::Uuid;
+
+    let user_token = cookies.get("token");
+    let user_token = match user_token {
+        Some(cookie) => match Uuid::parse_str(cookie.value_trimmed()) {
+            Ok(upl_id) => upl_id,
+            Err(_) => return Err(ApiError::new("InvalidToken", "Invalid token").to_json()),
+        },
+        None => return Err(ApiError::new("Unauthorized", "Unauthorized").to_json()),
+    };
+
+    let mut conn = match db.get() {
+        Ok(c) => c,
+        Err(e) => return Err(ApiError::from_error(&e).to_json()),
+    };
+
+    let found_user = match users
+        .filter(users::id.eq(user_token))
+        .first::<User>(&mut *conn)
+    {
+        Ok(usr) => usr,
+        Err(e) => return Err(ApiError::from_error(&e).to_json()),
+    };
+
+    if found_user.password != new_user.old_password {
+        return Err(ApiError::new("WrongPassword", LoginError::WrongPassword).to_json());
+    }
+
+    let new_user = User {
+        id: found_user.id,
+        username: (&new_user.username.trim()).to_string(),
+        password: (&new_user.new_password.trim()).to_string(),
+        profile_url: Some((&new_user.profile_url.trim()).to_string()),
+        bio: Some((&new_user.bio.trim()).to_string()),
+    };
+
+    if let Err(e) = diesel::insert_into(users::table)
+        .values(&new_user)
+        .on_conflict(users::id)
+        .do_update()
+        .set((
+            users::username.eq(&new_user.username),
+            users::password.eq(&new_user.password),
+            users::profile_url.eq(&new_user.profile_url),
+            users::bio.eq(&new_user.bio),
+        ))
+        .execute(&mut *conn)
+    {
+        return Err(ApiError::from_error(&e).to_json());
+    } else {
+        Ok(Json(new_user))
     }
 }
 

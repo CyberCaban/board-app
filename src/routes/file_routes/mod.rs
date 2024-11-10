@@ -165,6 +165,7 @@ pub fn api_delete_file(
 ) -> Result<Json<Value>, Json<Value>> {
     use crate::models::UploadedFile as File;
     use crate::schema::{files as files_schema, files::dsl::files};
+    use diesel::BoolExpressionMethods;
 
     let uploader_id = cookies.get("token");
     if uploader_id.is_none() {
@@ -179,8 +180,11 @@ pub fn api_delete_file(
     };
     let mut conn = connect_db!(db);
     match files
-        .filter(files_schema::user_id.eq(uploader_id))
-        .filter(files_schema::name.eq(file_name))
+        .filter(
+            files_schema::user_id
+                .eq(uploader_id)
+                .and(files_schema::name.eq(file_name)),
+        )
         .first::<File>(&mut *conn)
     {
         Ok(f) => {
@@ -200,12 +204,15 @@ pub fn api_delete_file(
             }
             Ok(Json(json!("File deleted")))
         }
-        Err(_) => Ok(Json(json!("File not found"))),
+        Err(_) => Err(ApiError::new("YouDoNotOwnThisFile", "You do not own this file").to_json()),
     }
 }
 
 #[get("/files")]
-pub fn api_get_files(db: &State<Connection>, cookies: &CookieJar<'_>) -> Result<Json<Value>, Json<Value>> {
+pub fn api_get_files(
+    db: &State<Connection>,
+    cookies: &CookieJar<'_>,
+) -> Result<Json<Value>, Json<Value>> {
     use crate::models::UploadedFile as File;
     use crate::schema::files as files_schema;
     use diesel::BoolExpressionMethods;
