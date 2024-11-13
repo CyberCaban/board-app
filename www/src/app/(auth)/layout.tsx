@@ -1,16 +1,9 @@
-import Navbar from "@/components/Navbar";
+"use client";
 
 export default function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <html lang="en">
-      <body>
-        <Navbar />
-        {children}
-      </body>
-    </html>
-  );
+  return <>{children}</>;
 }

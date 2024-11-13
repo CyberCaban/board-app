@@ -1,7 +1,8 @@
 use diesel::query_dsl::methods::FilterDsl;
 use diesel::{ExpressionMethods, RunQueryDsl};
-use rocket::http::CookieJar;
+use rocket::http::{Cookie, CookieJar};
 use rocket::response::content::RawHtml;
+use rocket::time::{Duration, OffsetDateTime};
 use rocket::{serde::json::Json, State};
 use serde_json::{json, Value};
 
@@ -25,6 +26,34 @@ pub struct UpdateUser<'a> {
     new_password: &'a str,
     profile_url: &'a str,
     bio: &'a str,
+}
+
+#[get("/user")]
+pub fn api_get_user(
+    db: &State<Connection>,
+    cookies: &CookieJar<'_>,
+) -> Result<Json<User>, Json<Value>> {
+    use self::models::User;
+    use uuid::Uuid;
+    let user_token = cookies.get("token");
+    let user_token = match user_token {
+        Some(cookie) => match Uuid::parse_str(cookie.value_trimmed()) {
+            Ok(upl_id) => upl_id,
+            Err(_) => return Err(ApiError::new("InvalidToken", "Invalid token").to_json()),
+        },
+        None => return Err(ApiError::new("Unauthorized", "Unauthorized").to_json()),
+    };
+    let mut conn = match db.get() {
+        Ok(c) => c,
+        Err(e) => return Err(ApiError::from_error(&e).to_json()),
+    };
+    match users
+        .filter(users::id.eq(user_token))
+        .first::<User>(&mut *conn)
+    {
+        Ok(user) => Ok(Json(user)),
+        Err(e) => Err(ApiError::from_error(&e).to_json()),
+    }
 }
 
 #[post("/register", format = "json", data = "<user>")]
@@ -108,7 +137,9 @@ pub fn api_login(
             if usr.password != user.password {
                 Err(ApiError::new("WrongPassword", LoginError::WrongPassword).to_json())
             } else {
-                cookies.add(("token", usr.id.to_string()));
+                let cookie = Cookie::build(("token", usr.id.to_string()))
+                    .expires(OffsetDateTime::now_utc().checked_add(Duration::days(1)));
+                cookies.add(cookie);
                 Ok(Json(usr))
             }
         }
@@ -120,7 +151,7 @@ pub fn api_update_user(
     db: &State<Connection>,
     new_user: Json<UpdateUser<'_>>,
     cookies: &CookieJar<'_>,
-) -> Result<Json<User>, Json<Value>> {
+) -> Result<Json<Value>, Json<Value>> {
     use self::models::User;
     use uuid::Uuid;
 
@@ -146,33 +177,34 @@ pub fn api_update_user(
         Err(e) => return Err(ApiError::from_error(&e).to_json()),
     };
 
-    if found_user.password != new_user.old_password {
-        return Err(ApiError::new("WrongPassword", LoginError::WrongPassword).to_json());
-    }
+    // if found_user.password != new_user.old_password {
+    //     return Err(ApiError::new("WrongPassword", LoginError::WrongPassword).to_json());
+    // }
 
-    let new_user = User {
-        id: found_user.id,
-        username: (&new_user.username.trim()).to_string(),
-        password: (&new_user.new_password.trim()).to_string(),
-        profile_url: Some((&new_user.profile_url.trim()).to_string()),
-        bio: Some((&new_user.bio.trim()).to_string()),
-    };
+    // let new_user = User {
+    //     id: found_user.id,
+    //     username: (&new_user.username.trim()).to_string(),
+    //     password: (&new_user.new_password.trim()).to_string(),
+    //     profile_url: Some((&new_user.profile_url.trim()).to_string()),
+    //     bio: Some((&new_user.bio.trim()).to_string()),
+    // };
 
-    if let Err(e) = diesel::insert_into(users::table)
-        .values(&new_user)
-        .on_conflict(users::id)
-        .do_update()
+    if let Err(e) = diesel::update(users::table)
+        .filter(users::id.eq(user_token))
+        // .values(&new_user)
+        // .on_conflict(users::id)
+        // .do_update()
         .set((
-            users::username.eq(&new_user.username),
-            users::password.eq(&new_user.password),
-            users::profile_url.eq(&new_user.profile_url),
-            users::bio.eq(&new_user.bio),
+            users::username.eq(&new_user.username.trim()),
+            // users::password.eq(&new_user.password),
+            users::profile_url.eq(&new_user.profile_url.trim()),
+            users::bio.eq(&new_user.bio.trim()),
         ))
         .execute(&mut *conn)
     {
         return Err(ApiError::from_error(&e).to_json());
     } else {
-        Ok(Json(new_user))
+        Ok(Json(json!(new_user.into_inner())))
     }
 }
 
