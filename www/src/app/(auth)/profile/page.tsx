@@ -1,7 +1,7 @@
 "use client";
 import { useUserStore } from "@/providers/userProvider";
 import Image from "next/image";
-import user from "../../../../public/user.svg";
+import userSVG from "../../../../public/user.svg";
 import { Input } from "@/components/ui/input";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -20,50 +20,75 @@ import { putData } from "@/utils/utils";
 
 const formSchema = z.object({
   username: z.string().min(3).max(20),
-  oldPassword: z.string().min(8).max(20),
-  newPassword: z.string().min(8).max(20),
-  confirmPassword: z.string().min(8).max(20),
+  profile_url: z.string(),
+  // oldPassword: z.string().min(8).max(20),
+  // newPassword: z.string().min(8).max(20),
+  // confirmPassword: z.string().min(8).max(20),
 });
 
 export default function Profile() {
-  const [store] = useUserStore((state) => state);
+  const [store] = useUserStore((state) => {
+    return state;
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       username: store.username,
-      oldPassword: "",
-      newPassword: "",
-      confirmPassword: "",
+      profile_url: store.profile_url,
+      // oldPassword: "",
+      // newPassword: "",
+      // confirmPassword: "",
+    },
+    values: {
+      username: store.username,
+      profile_url: store.profile_url,
+      // oldPassword: "",
+      // newPassword: "",
+      // confirmPassword: "",
     },
   });
+
   const onSubmit = (data: z.infer<typeof formSchema>) => {
-    const { username, oldPassword, newPassword, confirmPassword } = data;
+    const {
+      username,
+      // oldPassword,
+      // newPassword,
+      // confirmPassword,
+      profile_url,
+    } = data;
 
-    if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
+    // if (newPassword !== confirmPassword) {
+    //   toast.error("Passwords do not match");
+    //   return;
+    // }
 
-    if (newPassword === oldPassword) {
-      toast.error("New password cannot be the same as the old password");
-      return;
-    }
+    // if (newPassword === oldPassword) {
+    //   toast.error("New password cannot be the same as the old password");
+    //   return;
+    // }
 
     putData("/api/user", {
       username,
-      old_password: oldPassword,
-      new_password: newPassword,
-      profile_url: "",
+      // old_password: oldPassword,
+      // new_password: newPassword,
+      old_password: "",
+      new_password: "",
+      profile_url: profile_url,
       bio: "",
     })
-      .then(() => {
+      .then((user) => {
+        console.log(user);
+        store.setUser({
+          id: store.id,
+          username: user.username,
+          profile_url: user.profile_url,
+        });
+
         toast.success("Profile updated successfully");
         form.reset({
-          username,
-          oldPassword: "",
-          newPassword: "",
-          confirmPassword: "",
+          username: user.username,
+          profile_url: user.profile_url,
         });
       })
       .catch((err) => toast.error(err.message));
@@ -73,11 +98,12 @@ export default function Profile() {
     <main className="flex min-h-screen flex-col items-center p-24">
       <h1>Profile</h1>
       <Image
-        src={store.profile_url || user}
+        src={store.profile_url || userSVG}
         alt="Profile Image"
         width={100}
         height={100}
       />
+      <Button className="mt-4" onClick={() => store.logout()}>Logout</Button>
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
@@ -97,6 +123,19 @@ export default function Profile() {
             )}
           />
           <FormField
+            control={form.control}
+            name="profile_url"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Profile URL</FormLabel>
+                <FormControl>
+                  <Input {...field} />
+                </FormControl>
+                <FormDescription>Change your profile URL</FormDescription>
+              </FormItem>
+            )}
+          />
+          {/* <FormField
             control={form.control}
             name="oldPassword"
             render={({ field }) => (
@@ -136,7 +175,7 @@ export default function Profile() {
                 <FormDescription>Confirm your new password</FormDescription>
               </FormItem>
             )}
-          />
+          /> */}
           <Button type="submit">Save</Button>
         </form>
       </Form>
