@@ -95,7 +95,7 @@ export default function Profile() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-24">
+    <>
       <h1>Profile</h1>
       <Image
         src={store.profile_url || userSVG}
@@ -179,6 +179,6 @@ export default function Profile() {
           <Button type="submit">Save</Button>
         </form>
       </Form>
-    </main>
+    </>
   );
 }
