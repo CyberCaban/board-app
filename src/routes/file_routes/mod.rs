@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::connect_db;
 use crate::errors::LoginError;
 use crate::schema::users::dsl::*;
-use crate::{database::Connection, errors::ApiError, models::User};
+use crate::{database::PSQLConnection, errors::ApiError, models::User};
 
 #[derive(FromForm, Debug)]
 pub struct UploadRequest<'r> {
@@ -21,7 +21,7 @@ pub struct UploadRequest<'r> {
 #[post("/file/create", data = "<form>")]
 pub async fn api_upload_file(
     form: Form<UploadRequest<'_>>,
-    db: &State<Connection>,
+    db: &State<PSQLConnection>,
     cookies: &CookieJar<'_>,
 ) -> Result<Json<Value>, Json<Value>> {
     use crate::models::UploadedFile as File;
@@ -103,7 +103,7 @@ pub async fn api_upload_file(
 #[get("/file/<file_name>")]
 pub async fn api_get_file(
     file_name: &str,
-    db: &State<Connection>,
+    db: &State<PSQLConnection>,
     cookies: &CookieJar<'_>,
 ) -> Option<NamedFile> {
     use crate::models::UploadedFile as File;
@@ -160,7 +160,7 @@ pub async fn api_get_file(
 #[delete("/file/<file_name>")]
 pub fn api_delete_file(
     file_name: &str,
-    db: &State<Connection>,
+    db: &State<PSQLConnection>,
     cookies: &CookieJar<'_>,
 ) -> Result<Json<Value>, Json<Value>> {
     use crate::models::UploadedFile as File;
@@ -210,7 +210,7 @@ pub fn api_delete_file(
 
 #[get("/files")]
 pub fn api_get_files(
-    db: &State<Connection>,
+    db: &State<PSQLConnection>,
     cookies: &CookieJar<'_>,
 ) -> Result<Json<Value>, Json<Value>> {
     use crate::models::UploadedFile as File;

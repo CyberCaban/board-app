@@ -3,9 +3,9 @@ use rocket::tokio::sync::{Mutex, MutexGuard};
 
 use crate::services;
 
-pub struct Connection(Mutex<PgConnection>);
+pub struct PSQLConnection(Mutex<PgConnection>);
 
-impl Connection {
+impl PSQLConnection {
     pub fn new() -> Self {
         Self(Mutex::new(services::connect_pg()))
     }
