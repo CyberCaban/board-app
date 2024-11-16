@@ -22,7 +22,7 @@ diesel::table! {
         id -> Uuid,
         creator_id -> Uuid,
         #[max_length = 255]
-        name -> Nullable<Varchar>,
+        name -> Varchar,
     }
 }
 

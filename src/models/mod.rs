@@ -28,8 +28,18 @@ pub struct UploadedFile {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct PubBoard {
+    pub id: uuid::Uuid,
+    pub name: String,
+}
+#[derive(Serialize, Deserialize)]
+pub struct NewBoard<'a> {
+    pub name: &'a str,
+}
+#[derive(Serialize, Deserialize)]
 pub struct BoardInfo {
     pub id: uuid::Uuid,
+    pub name: String,
     pub columns: Vec<PubColumn>,
     pub cards: Vec<PubCard>,
 }
@@ -74,6 +84,7 @@ pub struct PubCard {
     pub id: uuid::Uuid,
     pub position: i32,
     pub description: Option<String>,
+    pub column_id: uuid::Uuid,
 }
 #[derive(Serialize, Deserialize)]
 pub struct NewCard<'a> {
