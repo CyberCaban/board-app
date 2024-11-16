@@ -8,12 +8,13 @@ use crate::{
     database::PSQLConnection,
     errors::{ApiError, ApiErrorType},
     models::{
-        Board, BoardColumn, BoardInfo, BoardUsersRelation, ColumnCard, NewCard, NewColumn, PubCard, PubColumn, ReturnedCard, ReturnedColumn
+        Board, BoardColumn, BoardInfo, BoardUsersRelation, ColumnCard, NewBoard, NewCard,
+        NewColumn, PubBoard, PubCard, PubColumn, ReturnedCard, ReturnedColumn,
     },
     schema::{board_column, board_users_relation, boards, column_card},
 };
 
-/// # POST /board
+/// # POST /boards
 /// Creates a new board
 /// # Arguments
 /// * `board` - The name of the board
@@ -24,7 +25,7 @@ use crate::{
 pub fn boards_create_board_and_relation(
     db: &State<PSQLConnection>,
     cookies: &CookieJar<'_>,
-    board: &str,
+    board: Json<NewBoard>,
 ) -> Result<Json<Value>, Json<Value>> {
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
@@ -33,7 +34,7 @@ pub fn boards_create_board_and_relation(
         let board_id = diesel::insert_into(boards::table)
             .values(Board {
                 id: None,
-                name: board.to_string(),
+                name: board.name.to_string(),
                 creator_id: token,
             })
             .returning(boards::id)
@@ -46,7 +47,7 @@ pub fn boards_create_board_and_relation(
             .execute(conn)?;
         Ok::<uuid::Uuid, diesel::result::Error>(board_id)
     })
-    .map(|id| (Json(json!({"board_id": id}))))
+    .map(|id| (Json(json!(id))))
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
@@ -56,6 +57,15 @@ pub fn boards_create_board_and_relation(
 /// * `cookies` - Takes the token of the user
 /// # Returns
 /// * `boards` - A list of board id's of the user
+/// ```json
+/// [
+///     {
+///         "id": <board_id>,
+///         "name": <board_name>,
+///     },
+///     ...
+/// ]
+/// ```
 #[get("/")]
 pub fn boards_get_boards(
     db: &State<PSQLConnection>,
@@ -63,21 +73,59 @@ pub fn boards_get_boards(
 ) -> Result<Json<Value>, Json<Value>> {
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
-    board_users_relation::table
-        .filter(board_users_relation::user_id.eq(token))
-        .select(board_users_relation::board_id)
-        .load::<Uuid>(&mut *conn)
-        .map(|ids| Json(json!(ids)))
-        .map_err(|e| ApiError::from_error(&e).to_json())
+    let conn = &mut *conn;
+    conn.transaction(|conn| {
+        let ids = board_users_relation::table
+            .filter(board_users_relation::user_id.eq(token))
+            .select(board_users_relation::board_id)
+            .load::<Uuid>(&mut *conn)?;
+        let bds = ids
+            .iter()
+            .map(|id| {
+                boards::table
+                    .filter(boards::id.eq(id))
+                    .select((boards::id, boards::name))
+                    .first::<(Uuid, String)>(conn)
+                    .map(|(id, name)| PubBoard { id, name })
+            })
+            .filter_map(Result::ok)
+            .collect::<Vec<_>>();
+        Ok::<Vec<PubBoard>, diesel::result::Error>(bds)
+    })
+    .map(|ids| (Json(json!(ids))))
+    .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # GET /board/<board_id>
+/// # GET /boards/<board_id>
 /// Returns the board with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
 /// * `cookies` - Takes the token of the user
 /// # Returns
 /// * `board` - The board
+/// ```json
+/// {
+///     "id": <board_id>,
+///     "name": <board_name>,
+///     "columns": [
+///         {
+///             "id": <column_id>,
+///             "name": <column_name>,
+///             "position": <column_position>
+///         },
+///         ...
+///     ],
+///     "cards": [
+///         {
+///             "id": <card_id>,
+///             "column_id": <column_id>,
+///             "description": <card_description>,
+///             "position": <card_position>
+///         },
+///         ...
+///     ]
+/// }
+/// ```
 #[get("/<board_id>")]
 pub fn boards_get_board(
     db: &State<PSQLConnection>,
@@ -88,7 +136,7 @@ pub fn boards_get_board(
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
+        let board_id = Uuid::try_parse(board_id).expect("Invalid board id");
         let _ = board_users_relation::table
             .filter(
                 board_users_relation::board_id
@@ -96,6 +144,10 @@ pub fn boards_get_board(
                     .and(board_users_relation::user_id.eq(token)),
             )
             .first::<BoardUsersRelation>(conn)?;
+        let board_name = boards::table
+            .filter(boards::id.eq(board_id))
+            .select(boards::name)
+            .first::<String>(conn)?;
         let columns = board_column::table
             .filter(board_column::board_id.eq(board_id))
             .select((board_column::id, board_column::name, board_column::position))
@@ -119,11 +171,13 @@ pub fn boards_get_board(
             .into_iter()
             .map(|card| PubCard {
                 id: card.0,
+                column_id: card.1,
                 description: card.2,
                 position: card.3,
             })
             .collect::<Vec<PubCard>>();
         let board = BoardInfo {
+            name: board_name,
             id: board_id,
             columns,
             cards,
@@ -134,7 +188,7 @@ pub fn boards_get_board(
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # PUT /board/<board_id>
+/// # PUT /boards/<board_id>
 /// Updates the board with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
@@ -165,7 +219,7 @@ pub fn boards_update_board(
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # DELETE /board/<board_id>
+/// # DELETE /boards/<board_id>
 /// Deletes the board with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
@@ -194,14 +248,14 @@ pub fn boards_delete_board(
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # POST /board/<board_id>/column
+/// # POST /boards/<board_id>/columns
 /// Creates a new column in the board with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
 /// * `cookies` - Takes the token of the user
 /// # Returns
 /// * `column_id` - The id of the column
-#[post("/<board_id>/column", data = "<column>")]
+#[post("/<board_id>/columns", data = "<column>")]
 pub fn boards_create_column(
     db: &State<PSQLConnection>,
     cookies: &CookieJar<'_>,
@@ -235,13 +289,23 @@ pub fn boards_create_column(
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # GET /board/<board_id>/columns
+/// # GET /boards/<board_id>/columns
 /// Returns all the columns of the board with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
 /// * `cookies` - Takes the token of the user
 /// # Returns
 /// * `columns` - A list of columns id's of the board
+/// ```json
+///  [
+///        {
+///            "id": <column_id>,
+///            "name": <column_name>,
+///            "position": <column_position>
+///        },
+///        ...
+///  ]
+/// ```
 #[get("/<board_id>/columns")]
 pub fn boards_get_columns(
     db: &State<PSQLConnection>,
@@ -263,14 +327,21 @@ pub fn boards_get_columns(
         let columns = board_column::table
             .filter(board_column::board_id.eq(board_id))
             .select((board_column::id, board_column::name, board_column::position))
-            .load::<ReturnedColumn>(conn)?;
-        Ok::<Vec<ReturnedColumn>, diesel::result::Error>(columns)
+            .load::<ReturnedColumn>(conn)?
+            .into_iter()
+            .map(|col| PubColumn {
+                id: col.0,
+                name: col.1,
+                position: col.2,
+            })
+            .collect::<Vec<PubColumn>>();
+        Ok::<Vec<PubColumn>, diesel::result::Error>(columns)
     })
     .map(|columns| (Json(json!(columns))))
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # GET /board/<board_id>/column/<column_id>
+/// # GET /boards/<board_id>/columns/<column_id>
 /// Returns the column with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
@@ -278,7 +349,14 @@ pub fn boards_get_columns(
 /// * `cookies` - Takes the token of the user
 /// # Returns
 /// * `column` - The column
-#[get("/<board_id>/column/<column_id>")]
+/// ```json
+/// {
+///     "id": <column_id>,
+///     "name": <column_name>,
+///     "position": <column_position>
+/// }
+/// ```
+#[get("/<board_id>/columns/<column_id>")]
 pub fn boards_get_column(
     db: &State<PSQLConnection>,
     cookies: &CookieJar<'_>,
@@ -303,11 +381,17 @@ pub fn boards_get_column(
             .first::<ReturnedColumn>(conn)?;
         Ok::<ReturnedColumn, diesel::result::Error>(column)
     })
-    .map(|column| (Json(json!(column))))
+    .map(|column| {
+        Json(json!(PubColumn {
+            id: column.0,
+            name: column.1,
+            position: column.2
+        }))
+    })
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # PUT /board/<board_id>/column/<column_id>
+/// # PUT /boards/<board_id>/columns/<column_id>
 /// Updates the column with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
@@ -315,7 +399,14 @@ pub fn boards_get_column(
 /// * `cookies` - Takes the token of the user
 /// # Returns
 /// * `column` - The column
-#[put("/<board_id>/column/<column_id>", data = "<column>")]
+/// ```json
+/// {
+///     "id": <column_id>,
+///     "name": <column_name>,
+///     "position": <column_position>
+/// }
+/// ```
+#[put("/<board_id>/columns/<column_id>", data = "<column>")]
 pub fn boards_update_column(
     db: &State<PSQLConnection>,
     cookies: &CookieJar<'_>,
@@ -345,11 +436,17 @@ pub fn boards_update_column(
             .get_result::<ReturnedColumn>(conn)?;
         Ok::<ReturnedColumn, diesel::result::Error>(column)
     })
-    .map(|column| (Json(json!(column))))
+    .map(|column| {
+        Json(json!(PubColumn {
+            id: column.0,
+            name: column.1,
+            position: column.2
+        }))
+    })
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # DELETE /board/<board_id>/column/<column_id>
+/// # DELETE /boards/<board_id>/columns/<column_id>
 /// Deletes the column with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
@@ -357,7 +454,14 @@ pub fn boards_update_column(
 /// * `cookies` - Takes the token of the user
 /// # Returns
 /// * `column` - The column
-#[delete("/<board_id>/column/<column_id>")]
+/// ```json
+/// {
+///     "id": <column_id>,
+///     "name": <column_name>,
+///     "position": <column_position>
+/// }
+/// ```
+#[delete("/<board_id>/columns/<column_id>")]
 pub fn boards_delete_column(
     db: &State<PSQLConnection>,
     cookies: &CookieJar<'_>,
@@ -376,17 +480,26 @@ pub fn boards_delete_column(
                     .and(board_users_relation::user_id.eq(token)),
             )
             .first::<BoardUsersRelation>(conn)?;
+        let _ = diesel::delete(column_card::table)
+            .filter(column_card::column_id.eq(Uuid::parse_str(column_id).unwrap()))
+            .execute(conn)?;
         let column = diesel::delete(board_column::table)
             .filter(board_column::id.eq(Uuid::parse_str(column_id).unwrap()))
             .returning((board_column::id, board_column::name, board_column::position))
             .get_result::<ReturnedColumn>(conn)?;
         Ok::<ReturnedColumn, diesel::result::Error>(column)
     })
-    .map(|column| (Json(json!(column))))
+    .map(|column| {
+        Json(json!(PubColumn {
+            id: column.0,
+            name: column.1,
+            position: column.2
+        }))
+    })
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # POST /board/<board_id>/column/<column_id>/card
+/// # POST /boards/<board_id>/columns/<column_id>/cards
 /// Creates a new card in the column with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
@@ -395,7 +508,15 @@ pub fn boards_delete_column(
 /// * `card` - The card information
 /// # Returns
 /// * `card` - The card
-#[post("/<board_id>/column/<column_id>/card", data = "<card>")]
+/// ```json
+/// {
+///     "id": <card_id>,
+///     "column_id": <column_id>,
+///     "description": <card_description>,
+///     "position": <card_position>
+/// }
+/// ```
+#[post("/<board_id>/columns/<column_id>/cards", data = "<card>")]
 pub fn boards_create_card(
     db: &State<PSQLConnection>,
     cookies: &CookieJar<'_>,
@@ -438,11 +559,18 @@ pub fn boards_create_card(
             .get_result::<ReturnedCard>(conn)?;
         Ok::<ReturnedCard, diesel::result::Error>(card)
     })
-    .map(|card| (Json(json!(card))))
+    .map(|card| {
+        Json(json!(PubCard {
+            id: card.0,
+            column_id: card.1,
+            description: card.2,
+            position: card.3
+        }))
+    })
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # GET /board/<board_id>/column/<column_id>/card
+/// # GET /boards/<board_id>/columns/<column_id>/cards
 /// Returns all the cards in the column with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
@@ -450,7 +578,17 @@ pub fn boards_create_card(
 /// * `cookies` - Takes the token of the user
 /// # Returns
 /// * `cards` - A list of cards in the column
-#[get("/<board_id>/column/<column_id>/card")]
+/// ```json
+/// [
+///     {
+///         "id": <card_id>,
+///         "column_id": <column_id>,
+///         "description": <card_description>,
+///         "position": <card_position>
+///     },
+///     ...
+/// ]
+#[get("/<board_id>/columns/<column_id>/cards")]
 pub fn boards_get_cards(
     db: &State<PSQLConnection>,
     cookies: &CookieJar<'_>,
@@ -481,14 +619,22 @@ pub fn boards_get_cards(
                 column_card::description,
                 column_card::position,
             ))
-            .get_results::<ReturnedCard>(conn)?;
-        Ok::<Vec<ReturnedCard>, diesel::result::Error>(cards)
+            .get_results::<ReturnedCard>(conn)?
+            .into_iter()
+            .map(|card| PubCard {
+                id: card.0,
+                column_id: card.1,
+                description: card.2,
+                position: card.3,
+            })
+            .collect::<Vec<PubCard>>();
+        Ok::<Vec<PubCard>, diesel::result::Error>(cards)
     })
     .map(|cards| (Json(json!(cards))))
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # GET /board/<board_id>/column/<column_id>/card/<card_id>
+/// # GET /boards/<board_id>/columns/<column_id>/cards/<card_id>
 /// Returns the card with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
@@ -497,7 +643,15 @@ pub fn boards_get_cards(
 /// * `cookies` - Takes the token of the user
 /// # Returns
 /// * `card` - The card
-#[get("/<board_id>/column/<column_id>/card/<card_id>")]
+/// ```json
+/// {
+///     "id": <card_id>,
+///     "column_id": <column_id>,
+///     "description": <card_description>,
+///     "position": <card_position>
+/// }
+/// ```
+#[get("/<board_id>/columns/<column_id>/cards/<card_id>")]
 pub fn boards_get_card(
     db: &State<PSQLConnection>,
     cookies: &CookieJar<'_>,
@@ -532,11 +686,18 @@ pub fn boards_get_card(
             .first::<ReturnedCard>(conn)?;
         Ok::<ReturnedCard, diesel::result::Error>(card)
     })
-    .map(|card| (Json(json!(card))))
+    .map(|card| {
+        Json(json!(PubCard {
+            id: card.0,
+            column_id: card.1,
+            description: card.2,
+            position: card.3
+        }))
+    })
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # PUT /board/<board_id>/column/<column_id>/card/<card_id>
+/// # PUT /boards/<board_id>/columns/<column_id>/cards/<card_id>
 /// Updates the card with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
@@ -546,7 +707,15 @@ pub fn boards_get_card(
 /// * `card` - The card information
 /// # Returns
 /// * `card` - The card
-#[put("/<board_id>/column/<column_id>/card/<card_id>", data = "<card>")]
+/// ```json
+/// {
+///     "id": <card_id>,
+///     "column_id": <column_id>,
+///     "description": <card_description>,
+///     "position": <card_position>
+/// }
+/// ```
+#[put("/<board_id>/columns/<column_id>/cards/<card_id>", data = "<card>")]
 pub fn boards_update_card(
     db: &State<PSQLConnection>,
     cookies: &CookieJar<'_>,
@@ -587,11 +756,18 @@ pub fn boards_update_card(
             .get_result::<ReturnedCard>(conn)?;
         Ok::<ReturnedCard, diesel::result::Error>(card)
     })
-    .map(|card| (Json(json!(card))))
+    .map(|card| {
+        Json(json!(PubCard {
+            id: card.0,
+            column_id: card.1,
+            description: card.2,
+            position: card.3
+        }))
+    })
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # DELETE /board/<board_id>/column/<column_id>/card/<card_id>
+/// # DELETE /boards/<board_id>/columns/<column_id>/cards/<card_id>
 /// Deletes the card with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
@@ -599,8 +775,8 @@ pub fn boards_update_card(
 /// * `card_id` - The id of the card
 /// * `cookies` - Takes the token of the user
 /// # Returns
-/// * `card` - The card
-#[delete("/<board_id>/column/<column_id>/card/<card_id>")]
+/// * `card_id` - card id
+#[delete("/<board_id>/columns/<column_id>/cards/<card_id>")]
 pub fn boards_delete_card(
     db: &State<PSQLConnection>,
     cookies: &CookieJar<'_>,
@@ -638,13 +814,13 @@ pub fn boards_delete_card(
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # POST /board/<board_id>/collaborators
+/// # POST /boards/<board_id>/collaborators
 /// Adds a collaborator to the board with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
 /// * `cookies` - Takes the token of the user
 /// # Returns
-/// * `board` - The board
+/// * `collaborator_id` - The id of the collaborator
 #[post("/<board_id>/collaborators", data = "<collaborator_id>")]
 pub fn boards_add_collaborator(
     db: &State<PSQLConnection>,
@@ -677,7 +853,7 @@ pub fn boards_add_collaborator(
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # GET /board/<board_id>/collaborators
+/// # GET /boards/<board_id>/collaborators
 /// Returns all the collaborators of the board with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
@@ -712,14 +888,14 @@ pub fn boards_get_collaborators(
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # GET /board/<board_id>/collaborators/<collaborator_id>
+/// # GET /boards/<board_id>/collaborators/<collaborator_id>
 /// Returns the collaborator with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
 /// * `collaborator_id` - The id of the collaborator
 /// * `cookies` - Takes the token of the user
 /// # Returns
-/// * `collaborator` - The collaborator
+/// * `collaborator_id` - The id of the collaborator
 #[get("/<board_id>/collaborators/<collaborator_id>")]
 pub fn boards_get_collaborator(
     db: &State<PSQLConnection>,
@@ -752,7 +928,7 @@ pub fn boards_get_collaborator(
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
-/// # DELETE /board/<board_id>/collaborators/<collaborator_id>
+/// # DELETE /boards/<board_id>/collaborators/<collaborator_id>
 /// Removes the collaborator with the given id from the board
 /// # Arguments
 /// * `board_id` - The id of the board
@@ -786,14 +962,6 @@ pub fn boards_remove_collaborator(
             .select(boards::id)
             .first::<Uuid>(conn)?;
         let collaborator_id = Uuid::parse_str(collaborator_id).unwrap();
-        // Check if the collaborator is a member of the board
-        let _ = board_users_relation::table
-            .filter(
-                board_users_relation::board_id
-                    .eq(board_id)
-                    .and(board_users_relation::user_id.eq(collaborator_id)),
-            )
-            .first::<BoardUsersRelation>(conn)?;
         // Delete the collaborator
         diesel::delete(board_users_relation::table)
             .filter(
@@ -807,4 +975,3 @@ pub fn boards_remove_collaborator(
     .map(|collaborator_id| (Json(json!(collaborator_id))))
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
-
