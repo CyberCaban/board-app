@@ -24,3 +24,5 @@ export interface IBoard {
   columns: IBoardColumn[];
   cards: IBoardCard[];
 }
+
+export type ApiError = "Failed to parse UUID" | "Unauthorized";

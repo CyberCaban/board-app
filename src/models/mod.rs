@@ -80,6 +80,13 @@ pub struct BoardColumn {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct SwapCards<'a> {
+    pub card1_id: &'a str,
+    pub card2_id: &'a str,
+    pub card1_position: i32,
+    pub card2_position: i32,
+}
+#[derive(Serialize, Deserialize)]
 pub struct PubCard {
     pub id: uuid::Uuid,
     pub position: i32,

@@ -9,7 +9,7 @@ use crate::{
     errors::{ApiError, ApiErrorType},
     models::{
         Board, BoardColumn, BoardInfo, BoardUsersRelation, ColumnCard, NewBoard, NewCard,
-        NewColumn, PubBoard, PubCard, PubColumn, ReturnedCard, ReturnedColumn,
+        NewColumn, PubBoard, PubCard, PubColumn, ReturnedCard, ReturnedColumn, SwapCards,
     },
     schema::{board_column, board_users_relation, boards, column_card},
 };
@@ -135,8 +135,9 @@ pub fn boards_get_board(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::try_parse(board_id).expect("Invalid board id");
         let _ = board_users_relation::table
             .filter(
                 board_users_relation::board_id
@@ -205,8 +206,9 @@ pub fn boards_update_board(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
         let board = diesel::update(
             boards::table.filter(boards::id.eq(board_id).and(boards::creator_id.eq(token))),
         )
@@ -235,8 +237,21 @@ pub fn boards_delete_board(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
+        let column_ids = board_column::table
+            .filter(board_column::board_id.eq(board_id))
+            .select(board_column::id)
+            .load::<Uuid>(conn)?;
+        diesel::delete(column_card::table.filter(column_card::column_id.eq_any(column_ids)))
+            .execute(conn)?;
+        diesel::delete(board_column::table.filter(board_column::board_id.eq(board_id)))
+            .execute(conn)?;
+        diesel::delete(
+            board_users_relation::table.filter(board_users_relation::board_id.eq(board_id)),
+        )
+        .execute(conn)?;
         let id = diesel::delete(
             boards::table.filter(boards::id.eq(board_id).and(boards::creator_id.eq(token))),
         )
@@ -265,8 +280,9 @@ pub fn boards_create_column(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
         let _ = board_users_relation::table
             .filter(
                 board_users_relation::board_id
@@ -315,8 +331,9 @@ pub fn boards_get_columns(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
         let _ = board_users_relation::table
             .filter(
                 board_users_relation::board_id
@@ -366,8 +383,9 @@ pub fn boards_get_column(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
         let _ = board_users_relation::table
             .filter(
                 board_users_relation::board_id
@@ -417,8 +435,9 @@ pub fn boards_update_column(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
         let _ = board_users_relation::table
             .filter(
                 board_users_relation::board_id
@@ -471,8 +490,9 @@ pub fn boards_delete_column(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
         let _ = board_users_relation::table
             .filter(
                 board_users_relation::board_id
@@ -527,8 +547,9 @@ pub fn boards_create_card(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
         let _ = board_users_relation::table
             .filter(
                 board_users_relation::board_id
@@ -598,8 +619,9 @@ pub fn boards_get_cards(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
         let _ = board_users_relation::table
             .filter(
                 board_users_relation::board_id
@@ -662,8 +684,9 @@ pub fn boards_get_card(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
         let _ = board_users_relation::table
             .filter(
                 board_users_relation::board_id
@@ -727,8 +750,9 @@ pub fn boards_update_card(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
         let _ = board_users_relation::table
             .filter(
                 board_users_relation::board_id
@@ -767,6 +791,88 @@ pub fn boards_update_card(
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }
 
+/// # PUT /boards/<board_id>/columns/<column_id>/cards/<card1_id>/<card2_id>
+/// Swaps the position of two cards
+/// # Arguments
+/// * `board_id` - The id of the board
+/// * `column_id` - The id of the column
+/// * `card_id` - The id of the card
+/// * `cookies` - Takes the token of the user
+/// * `card` - The card information
+/// # Returns
+/// * `card` - The card
+/// ```json
+/// {
+///     "id": <card_id>,
+///     "column_id": <column_id>,
+///     "description": <card_description>,
+///     "position": <card_position>
+/// }
+/// ```
+#[put("/<board_id>/columns/<column_id>/cards/<card1_id>/<card2_id>")]
+pub fn boards_swap_card(
+    db: &State<PSQLConnection>,
+    cookies: &CookieJar<'_>,
+    board_id: &str,
+    column_id: &str,
+    card1_id: &str,
+    card2_id: &str,
+) -> Result<Json<Value>, Json<Value>> {
+    let mut conn = connect_db!(db);
+    let token = check_user_token!(cookies, conn);
+    let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_message("Failed to parse board id".to_string()).to_json())?;
+    let column_id = Uuid::try_parse(column_id)
+        .map_err(|_| return ApiError::from_message("Failed to parse column id".to_string()).to_json())?;
+    let card1 = Uuid::try_parse(card1_id)
+        .map_err(|_| return ApiError::from_message("Failed to parse card 1 id".to_string()).to_json())?;
+    let card2 = Uuid::try_parse(card2_id)
+        .map_err(|_| return ApiError::from_message("Failed to parse card 2 id".to_string()).to_json())?;
+    conn.transaction(|conn| {
+        let _ = board_users_relation::table
+            .filter(
+                board_users_relation::board_id
+                    .eq(board_id)
+                    .and(board_users_relation::user_id.eq(token)),
+            )
+            .first::<BoardUsersRelation>(conn)?;
+        let column = board_column::table
+            .filter(board_column::id.eq(column_id))
+            .select(board_column::id)
+            .first::<Uuid>(conn)?;
+        let card1 = column_card::table
+            .filter(
+                column_card::id
+                    .eq(card1)
+                    .and(column_card::column_id.eq(column)),
+            )
+            .select((column_card::id, column_card::position))
+            .first::<(Uuid, i32)>(conn)?;
+        let card2 = column_card::table
+            .filter(
+                column_card::id
+                    .eq(card2)
+                    .and(column_card::column_id.eq(column)),
+            )
+            .select((column_card::id, column_card::position))
+            .first::<(Uuid, i32)>(conn)?;
+
+        diesel::update(column_card::table)
+            .filter(column_card::id.eq(card1.0))
+            .set(column_card::position.eq(card2.1))
+            .execute(conn)?;
+        diesel::update(column_card::table)
+            .filter(column_card::id.eq(card2.0))
+            .set(column_card::position.eq(card1.1))
+            .execute(conn)?;
+
+        Ok::<(Uuid, Uuid), diesel::result::Error>((card1.0, card2.0))
+    })
+    .map(|cards| Json(json!(cards)))
+    .map_err(|e| (ApiError::from_error(&e).to_json()))
+}
+
 /// # DELETE /boards/<board_id>/columns/<column_id>/cards/<card_id>
 /// Deletes the card with the given id
 /// # Arguments
@@ -787,8 +893,9 @@ pub fn boards_delete_card(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
         let _ = board_users_relation::table
             .filter(
                 board_users_relation::board_id
@@ -831,8 +938,9 @@ pub fn boards_add_collaborator(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
         let _ = board_users_relation::table
             .filter(
                 board_users_relation::board_id
@@ -869,8 +977,9 @@ pub fn boards_get_collaborators(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
         let _ = board_users_relation::table
             .filter(
                 board_users_relation::board_id
@@ -906,8 +1015,9 @@ pub fn boards_get_collaborator(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
         let _ = board_users_relation::table
             .filter(
                 board_users_relation::board_id
@@ -946,8 +1056,9 @@ pub fn boards_remove_collaborator(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
-        let board_id = Uuid::parse_str(board_id).unwrap();
         // Check if the user is the member of the board
         let _ = board_users_relation::table
             .filter(

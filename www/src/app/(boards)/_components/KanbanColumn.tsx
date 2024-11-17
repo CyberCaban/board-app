@@ -28,14 +28,26 @@ export default function KanbanColumn({
     e.preventDefault();
     const cardName = cardInputRef.current?.value;
     if (!cardName) return;
-    const cardsCountInColumn = kstore.cards.filter((card) => card.column_id === id).length;
-    kstore.addCard(cardName, id, cardsCountInColumn);
+    const cardsCountInColumn = kstore.cards
+      .filter((card) => card.column_id === id)
+      .toSorted((a, b) => b.position - a.position)[0]?.position;
+    console.log(
+      kstore.cards
+        .filter((card) => card.column_id === id)
+        .toSorted((a, b) => b.position - a.position)[0]?.position,
+    );
+
+    kstore.addCard(
+      cardName,
+      id,
+      cardsCountInColumn !== undefined ? cardsCountInColumn + 1 : 0,
+    );
     cardInputRef.current.value = "";
     setIsDanglingCard(true);
   };
 
   return (
-    <li className="min-w-[300px] max-w-[300px] overflow-x-hidden overflow-y-scroll rounded-xl p-4">
+    <li className="flex min-w-[300px] max-w-[300px] flex-col gap-2 overflow-x-hidden overflow-y-scroll rounded-xl p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl">{title}</h2>
         <Button className="h-8 px-2" onClick={() => kstore.deleteColumn(id)}>

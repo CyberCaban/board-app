@@ -8,7 +8,8 @@ pub enum ApiErrorType {
     InvalidFileType,
     UserAlreadyExists,
     UserNotFound,
-    YouDoNotOwnThisFile
+    YouDoNotOwnThisFile,
+    FailedToParseUUID,
 }
 
 impl ToString for ApiErrorType {
@@ -20,6 +21,7 @@ impl ToString for ApiErrorType {
             ApiErrorType::UserAlreadyExists => "User Already Exists".to_string(),
             ApiErrorType::UserNotFound => "User Not Found".to_string(),
             ApiErrorType::YouDoNotOwnThisFile => "You do not own this file".to_string(),
+            ApiErrorType::FailedToParseUUID => "Failed to parse UUID".to_string(),
         }
     }
 }
