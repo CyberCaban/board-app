@@ -1,5 +1,4 @@
 import { KanbanStoreProvider } from "@/providers/kanbanProvider";
-import { Suspense } from "react";
 
 export default function BoardsLayout({
   children,
@@ -8,9 +7,7 @@ export default function BoardsLayout({
 }) {
   return (
     <main className="flex flex-col px-6">
-      <KanbanStoreProvider>
-        <Suspense fallback={<div>Loading...</div>}>{children}</Suspense>
-      </KanbanStoreProvider>
+      <KanbanStoreProvider>{children}</KanbanStoreProvider>
     </main>
   );
 }

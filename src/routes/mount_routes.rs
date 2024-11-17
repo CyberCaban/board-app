@@ -42,7 +42,8 @@ impl AuthorizationRoutes for Rocket<Build> {
             board_routes::boards_add_collaborator,
             board_routes::boards_get_collaborators,
             board_routes::boards_get_collaborator,
-            board_routes::boards_remove_collaborator
+            board_routes::boards_remove_collaborator,
+            board_routes::boards_swap_card
         ],)
     }
 

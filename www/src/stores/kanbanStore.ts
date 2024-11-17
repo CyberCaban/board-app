@@ -1,5 +1,5 @@
 import { IBoard, IBoardCard } from "@/types";
-import { deleteData, getData, postData } from "@/utils/utils";
+import { deleteData, getData, postData, putData } from "@/utils/utils";
 import { toast } from "sonner";
 import { createStore } from "zustand";
 import { devtools, persist, subscribeWithSelector } from "zustand/middleware";
@@ -15,13 +15,14 @@ export type KanbanActions = {
   deleteColumn: (id: string) => void;
   updateColumn: (id: string, name: string, position: number) => void;
   addCard: (description: string, column_id: string, position: number) => void;
-  deleteCard: (id: string) => void;
+  deleteCard: (id: string, column_id: string) => void;
   updateCard: (
     id: string,
     description: string,
     column_id: string,
     position: number,
   ) => void;
+  swapCards: (id1: string, id2: string, column_id: string) => void;
 };
 
 export type KanbanStore = TKanban & KanbanActions;
@@ -66,6 +67,7 @@ export const createKanbanStore = (board: TKanban = defaultKanbanStore) => {
                 set((prev) => ({
                   ...prev,
                   columns: prev.columns.filter((column) => column.id !== id),
+                  cards: prev.cards.filter((card) => card.column_id !== id),
                 }));
               })
               .catch((e) => toast.error(e.message));
@@ -116,8 +118,8 @@ export const createKanbanStore = (board: TKanban = defaultKanbanStore) => {
               })
               .catch((e) => toast.error(e.message));
           },
-          deleteCard: (id: string) => {
-            deleteData(`/boards/${get().id}/cards/${id}`)
+          deleteCard: (id: string, column_id: string) => {
+            deleteData(`/boards/${get().id}/columns/${column_id}/cards/${id}`)
               .then(() => {
                 set((prev) => ({
                   ...prev,
@@ -132,19 +134,48 @@ export const createKanbanStore = (board: TKanban = defaultKanbanStore) => {
             column_id: string,
             position: number,
           ) => {
-            postData(`/boards/${get().id}/cards/${id}`, {
+            putData(`/boards/${get().id}/columns/${column_id}/cards/${id}`, {
               description,
               column_id,
               position,
             })
               .then(() => {
-                getData(`/boards/${get().id}/cards/${id}`)
+                getData(`/boards/${get().id}/columns/${column_id}/cards/${id}`)
                   .then((res) => {
                     set((prev) => ({
                       ...prev,
                       cards: prev.cards.map((card) => {
                         if (card.id === id) {
                           return res;
+                        }
+                        return card;
+                      }),
+                    }));
+                  })
+                  .catch((e) => toast.error(e.message));
+              })
+              .catch((e) => toast.error(e.message));
+          },
+          swapCards: (id1, id2, column_id) => {
+            putData(
+              `/boards/${get().id}/columns/${column_id}/cards/${id1}/${id2}`,
+              {},
+            )
+              .then(() => {
+                getData(`/boards/${get().id}/columns/${column_id}/cards`)
+                  .then((res) => {
+                    set((prev) => ({
+                      ...prev,
+                      cards: prev.cards.map((card) => {
+                        if (card.id === id1) {
+                          return res.find(
+                            (card: IBoardCard) => card.id === id2,
+                          )!;
+                        }
+                        if (card.id === id2) {
+                          return res.find(
+                            (card: IBoardCard) => card.id === id1,
+                          )!;
                         }
                         return card;
                       }),
