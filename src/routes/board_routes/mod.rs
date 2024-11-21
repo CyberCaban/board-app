@@ -727,7 +727,7 @@ pub fn boards_get_card(
 /// * `column_id` - The id of the column
 /// * `card_id` - The id of the card
 /// * `cookies` - Takes the token of the user
-/// * `card` - The card information
+/// * `card` - The card informatioe
 /// # Returns
 /// * `card` - The card
 /// ```json
@@ -945,9 +945,6 @@ pub fn boards_reorder_cards(
             )
             .select((column_card::id, column_card::position))
             .first::<(Uuid, i32)>(conn)?;
-        if card.1 == to_pos {
-            return Ok(card.0);
-        }
         let from_column = board_column::table
             .filter(board_column::id.eq(from_column_id))
             .select(board_column::id)
@@ -1038,6 +1035,10 @@ pub fn boards_delete_card(
     let conn = &mut *conn;
     let board_id = Uuid::try_parse(board_id)
         .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
+    let column_id = Uuid::try_parse(column_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
+    let card_id = Uuid::try_parse(card_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
     conn.transaction(|conn| {
         let _ = board_users_relation::table
             .filter(
@@ -1047,13 +1048,27 @@ pub fn boards_delete_card(
             )
             .first::<BoardUsersRelation>(conn)?;
         let column = board_column::table
-            .filter(board_column::id.eq(Uuid::parse_str(column_id).unwrap()))
+            .filter(board_column::id.eq(column_id))
             .select(board_column::id)
             .first::<Uuid>(conn)?;
+        let card = column_card::table
+            .filter(column_card::id.eq(card_id))
+            .select((column_card::id, column_card::position))
+            .first::<(Uuid, i32)>(conn)?;
+        diesel::update(
+            column_card::table.filter(
+                column_card::column_id
+                    .eq(column_id)
+                    .and(column_card::position.gt(card.1)),
+            ),
+        )
+        .set(column_card::position.eq(column_card::position - 1))
+        .execute(conn)?;
+
         let card = diesel::delete(column_card::table)
             .filter(
                 column_card::id
-                    .eq(Uuid::parse_str(card_id).unwrap())
+                    .eq(card_id)
                     .and(column_card::column_id.eq(column)),
             )
             .returning(column_card::id)
