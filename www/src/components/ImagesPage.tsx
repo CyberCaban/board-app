@@ -13,7 +13,6 @@ export default function ImagesAndUpload() {
 
   const fetchImages = () => {
     getData("/api/files").then((res) => {
-      console.log("getData", res);
       setImagesURL(
         res.map((file: IFile) => {
           if (file.private) return `/uploads/${file.user_id}/${file.name}`;
@@ -25,8 +24,7 @@ export default function ImagesAndUpload() {
 
   useEffect(() => {
     fetchImages();
-    const unsubscribe = store.subscribe((state) => {
-      console.log("state", state);
+    const unsubscribe = store.subscribe(() => {
       fetchImages();
     });
 
@@ -36,10 +34,9 @@ export default function ImagesAndUpload() {
   const handleDelete = (image: string) => {
     const filename = image.split("/").pop()!;
     deleteData(`/api/file/${filename}`)
-      .then((res) => {
+      .then(() => {
         setImagesURL(imagesURL.filter((img) => img !== image));
         toast.success("Image deleted successfully");
-        console.log(res);
       })
       .catch((err) => toast.error(err.message));
   };

@@ -25,6 +25,11 @@ const nextConfig: NextConfig = {
         destination: `${api_url}/uploads/:path*`,
         basePath: false,
       },
+      {
+        source: "/boards/:path*",
+        destination: `${api_url}/boards/:path*`,
+        basePath: false,
+      }
     ];
   },
   images: {

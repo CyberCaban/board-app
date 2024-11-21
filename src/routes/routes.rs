@@ -6,11 +6,10 @@ use rocket::time::{Duration, OffsetDateTime};
 use rocket::{serde::json::Json, State};
 use serde_json::{json, Value};
 
-use crate::database::Connection;
+use crate::database::PSQLConnection;
 use crate::errors::{ApiError, LoginError, RegisterError};
 use crate::models;
 use crate::models::User;
-use crate::schema::files::user_id;
 use crate::schema::users::{self, dsl::*};
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -30,7 +29,7 @@ pub struct UpdateUser<'a> {
 
 #[get("/user")]
 pub fn api_get_user(
-    db: &State<Connection>,
+    db: &State<PSQLConnection>,
     cookies: &CookieJar<'_>,
 ) -> Result<Json<User>, Json<Value>> {
     use self::models::User;
@@ -58,7 +57,7 @@ pub fn api_get_user(
 
 #[post("/register", format = "json", data = "<user>")]
 pub fn api_register(
-    db: &State<Connection>,
+    db: &State<PSQLConnection>,
     user: Json<NewUser<'_>>,
     cookies: &CookieJar<'_>,
 ) -> Result<Json<User>, Json<Value>> {
@@ -113,7 +112,7 @@ pub fn api_register(
 
 #[post("/login", format = "json", data = "<user>")]
 pub fn api_login(
-    db: &State<Connection>,
+    db: &State<PSQLConnection>,
     user: Json<NewUser<'_>>,
     cookies: &CookieJar<'_>,
 ) -> Result<Json<User>, Json<Value>> {
@@ -148,7 +147,7 @@ pub fn api_login(
 
 #[put("/user", format = "json", data = "<new_user>")]
 pub fn api_update_user(
-    db: &State<Connection>,
+    db: &State<PSQLConnection>,
     new_user: Json<UpdateUser<'_>>,
     cookies: &CookieJar<'_>,
 ) -> Result<Json<Value>, Json<Value>> {

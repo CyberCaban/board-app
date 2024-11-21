@@ -1,7 +1,7 @@
-use crate::database::Connection as Conn;
+use crate::database::PSQLConnection as Conn;
 use rocket::{fs::FileServer, Build, Rocket};
 
-use super::{file_routes, routes, AuthorizationRoutes};
+use super::{file_routes, routes, AuthorizationRoutes, board_routes};
 
 impl AuthorizationRoutes for Rocket<Build> {
     fn mount_auth_routes(self) -> Self {
@@ -20,6 +20,32 @@ impl AuthorizationRoutes for Rocket<Build> {
                 routes::toro
             ],
         )
+    }
+
+    fn mount_board_routes(self) -> Self {
+        self.mount("/boards", routes![
+            board_routes::boards_create_board_and_relation,
+            board_routes::boards_get_boards,
+            board_routes::boards_get_board,
+            board_routes::boards_update_board,
+            board_routes::boards_delete_board,
+            board_routes::boards_create_column,
+            board_routes::boards_get_columns,
+            board_routes::boards_get_column,
+            board_routes::boards_update_column,
+            board_routes::boards_delete_column,
+            board_routes::boards_create_card,
+            board_routes::boards_get_cards,
+            board_routes::boards_get_card,
+            board_routes::boards_update_card,
+            board_routes::boards_delete_card,
+            board_routes::boards_add_collaborator,
+            board_routes::boards_get_collaborators,
+            board_routes::boards_get_collaborator,
+            board_routes::boards_remove_collaborator,
+            board_routes::boards_swap_card,
+            board_routes::boards_reorder_cards
+        ],)
     }
 
     fn mount_static_files(self) -> Self {

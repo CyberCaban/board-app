@@ -16,7 +16,11 @@ export default function Navbar() {
         profile_url: res.profile_url,
       });
       console.log(res);
+    }).catch(err => {
+      console.error(err);
+      store.resetUser();
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   return (
@@ -25,6 +29,7 @@ export default function Navbar() {
         <Link href="/">Home</Link>
         <Link href="/register">Register</Link>
         <Link href="/login">Login</Link>
+        <Link href="/board">Boards</Link>
       </div>
       <div className="right_pad">{store.id ? <Profile /> : null}</div>
     </nav>
