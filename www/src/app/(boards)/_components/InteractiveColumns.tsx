@@ -5,6 +5,7 @@ import KanbanColumn from "./KanbanColumn";
 import Cards from "./Cards";
 import KanbanCard from "./KanbanCard";
 import { useKanbanStore } from "@/providers/kanbanProvider";
+import clsx from "clsx";
 
 // interface InteractiveColumnsProps {}
 export default function InteractiveColumns() {
@@ -13,7 +14,7 @@ export default function InteractiveColumns() {
   const [kstore] = useKanbanStore((state) => state);
 
   const [dragged, setDragged] = useState<string | null>(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const phantomCard = useRef<HTMLDivElement | null>(null);
   const [dropZone, setDropZone] = useState<number | null>(null);
   const [dropColumn, setDropColumn] = useState<string | null>(null);
   const dCard = useMemo(
@@ -23,75 +24,50 @@ export default function InteractiveColumns() {
 
   useEffect(() => {
     const mouseHandler = (e: MouseEvent) => {
-      setMousePos({ x: e.x - 20, y: e.y - 20 });
+      if (phantomCard.current === null) return;
+      phantomCard.current!.style.left = `${e.x - 20}px`;
+      phantomCard.current!.style.top = `${e.y - 20}px`;
+      if (dragged === null || phantomCard.current === null) return;
+      const elems = document.querySelectorAll(
+        `.drop-zone` + `.column-${dropColumn}`,
+      );
+
+      const positions = Array.from(elems).map(
+        (e) => e.getBoundingClientRect().top,
+      );
+
+      const diffs = positions.map((p) => Math.abs(p - e.y));
+      const minDiff = Math.min(...diffs);
+      let index = diffs.indexOf(minDiff);
+
+      if (dCard!.column_id === dropColumn && index - dCard!.position === 1) {
+        index -= 1;
+      }
+      // const newPosition =
+      //   dCard!.column_id === dropColumn
+      //     ? index <= dCard!.position
+      //       ? index
+      //       : index - 1
+      //     : index;
+      // console.log(newPosition);
+
+      setDropZone(index);
     };
     document.addEventListener("mousemove", mouseHandler);
     return () => document.removeEventListener("mousemove", mouseHandler);
-  }, []);
-  useEffect(() => {
-    if (dragged === null) return;
-    const elems = document.querySelectorAll(
-      `.drop-zone` + `.column-${dropColumn}`,
-    );
+  }, [dCard, dragged, dropColumn]);
 
-    const positions = Array.from(elems).map(
-      (e) => e.getBoundingClientRect().top,
-    );
-    const diffs = positions.map((p) => Math.abs(p - mousePos.y));
-    const minDiff = Math.min(...diffs);
-    let index = diffs.indexOf(minDiff);
-
-    if (dCard!.column_id === dropColumn && index - dCard!.position === 1) {
-      index -= 1;
-    }
-    // const newPosition =
-    //   dCard!.column_id === dropColumn
-    //     ? index <= dCard!.position
-    //       ? index
-    //       : index - 1
-    //     : index;
-    // console.log(newPosition);
-
-    setDropZone(index);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dragged, mousePos]);
- 
   return (
     <>
       {dragged !== null && (
         <div
-          className="absolute w-[300px]"
-          style={{ left: mousePos.x, top: mousePos.y }}
+          className={clsx(
+            "phantom-card pointer-events-none absolute w-[300px]",
+            { hidden: !phantomCard.current },
+          )}
+          ref={phantomCard}
         >
-          <KanbanCard
-            card={dCard!}
-            onMouseUp={(e) => {
-              e.preventDefault();
-              if (dropZone === null || dropColumn === null) return;
-              const newPosition =
-                dCard!.column_id === dropColumn
-                  ? dropZone <= dCard!.position
-                    ? dropZone
-                    : dropZone - 1
-                  : dropZone;
-              kstore.reorderList(
-                dCard!.column_id,
-                dropColumn!,
-                newPosition,
-                dCard!.id,
-              );
-              // console.log(
-              //   "reorder",
-              //   dCard!.position,
-              //   newPosition,
-              //   "diff columns:",
-              //   dCard!.column_id !== dropColumn,
-              // );
-              setDropZone(null);
-              setDropColumn(null);
-              setDragged(null);
-            }}
-          />
+          <KanbanCard card={dCard!} />
         </div>
       )}
       {kstore.columns.map((col) => (
@@ -99,7 +75,33 @@ export default function InteractiveColumns() {
           key={col.id}
           id={col.id}
           title={col.name}
-          onMouseEnter={() => setDropColumn(col.id)}
+          onMouseOver={() => setDropColumn(col.id)}
+          onMouseUp={(e) => {
+            e.preventDefault();
+            if (dropZone === null || dropColumn === null) return;
+            const newPosition =
+              dCard!.column_id === dropColumn
+                ? dropZone <= dCard!.position
+                  ? dropZone
+                  : dropZone - 1
+                : dropZone;
+            kstore.reorderList(
+              dCard!.column_id,
+              dropColumn!,
+              newPosition,
+              dCard!.id,
+            );
+            // console.log(
+            //   "reorder",
+            //   dCard!.position,
+            //   newPosition,
+            //   "diff columns:",
+            //   dCard!.column_id !== dropColumn,
+            // );
+            setDropZone(null);
+            setDropColumn(null);
+            setDragged(null);
+          }}
         >
           <Cards
             cards={kstore.cards}

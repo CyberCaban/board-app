@@ -1,3 +1,7 @@
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import clsx from "clsx";
 
 export default function DropZone({
@@ -13,18 +17,29 @@ export default function DropZone({
   column_id: string;
   dropColumn: string | null;
 }) {
+  const isVisible =
+    dragged !== null && dropZone === pos && column_id === dropColumn;
   return (
     <div
       className={clsx([
-        "drop-zone w-full px-4",
+        "drop-zone flex w-full flex-row items-center justify-between px-4",
         `column-${column_id}`,
         {
-          hidden:
-            dragged === null && dropZone !== pos,
-          "mb-2 rounded-md bg-neutral-800 py-2":
-            dragged !== null && dropZone === pos && column_id === dropColumn,
+          hidden: dragged === null && dropZone !== pos,
+          "mb-2 rounded-md bg-neutral-800 py-2": isVisible,
         },
       ])}
-    ></div>
+    >
+      {isVisible && (
+        <>
+          <p>&nbsp;</p>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="ml-2 h-auto w-auto self-start bg-transparent px-2 py-1 font-bold">
+              &nbsp;
+            </DropdownMenuTrigger>
+          </DropdownMenu>
+        </>
+      )}
+    </div>
   );
 }
