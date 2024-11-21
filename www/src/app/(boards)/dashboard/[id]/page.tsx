@@ -42,7 +42,7 @@ function Board(props: { params: Params }) {
       setError(e.message);
     });
     return () => kstore.reset();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
@@ -69,7 +69,7 @@ function Board(props: { params: Params }) {
             <p>{kstore.id}</p>
           </div>
           <ol className="flex h-[calc(100vh-200px)] w-11/12 flex-row items-start gap-4 overflow-x-scroll p-2">
-            <InteractiveColumns/>
+            <InteractiveColumns />
             {isDanglingColumn ? (
               <div className="min-w-60">
                 <form onSubmit={handleAddColumn}>
@@ -80,9 +80,9 @@ function Board(props: { params: Params }) {
                     onBlur={() => setIsDanglingColumn(false)}
                     ref={columnInputRef}
                   />
-                  <Button type="submit" className="mt-4">
+                  {/* <Button type="submit" className="mt-4">
                     Add Column
-                  </Button>
+                  </Button> */}
                 </form>
               </div>
             ) : (

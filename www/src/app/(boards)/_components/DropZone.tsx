@@ -25,7 +25,7 @@ export default function DropZone({
         "drop-zone flex w-full flex-row items-center justify-between px-4",
         `column-${column_id}`,
         {
-          hidden: dragged === null && dropZone !== pos,
+          hidden: dragged === null && dropZone !== pos || column_id !== dropColumn,
           "mb-2 rounded-md bg-neutral-800 py-2": isVisible,
         },
       ])}

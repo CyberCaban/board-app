@@ -191,7 +191,7 @@ export const createKanbanStore = (board: TKanban = defaultKanbanStore) => {
               })
               .catch((e) => toast.error(e.message));
           },
-          reorderList: (fromColumn, toColumn,toPos, cardId) => {
+          reorderList: (fromColumn, toColumn, toPos, cardId) => {
             putData(
               `/boards/${get().id}/columns/${fromColumn}/cards/${cardId}/reorder/${toColumn}/${toPos}`,
               {},

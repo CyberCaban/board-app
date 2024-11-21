@@ -9,8 +9,6 @@ import clsx from "clsx";
 
 // interface InteractiveColumnsProps {}
 export default function InteractiveColumns() {
-  const dragItem = useRef<HTMLDivElement | null>(null);
-  const dragOverItem = useRef<HTMLDivElement | null>(null);
   const [kstore] = useKanbanStore((state) => state);
 
   const [dragged, setDragged] = useState<string | null>(null);
@@ -106,8 +104,6 @@ export default function InteractiveColumns() {
           <Cards
             cards={kstore.cards}
             column_id={col.id}
-            dragItem={dragItem}
-            dragOverItem={dragOverItem}
             dragged={dragged}
             setDragged={setDragged}
             dropZone={dropZone}
