@@ -73,3 +73,28 @@ export function getCookie(name: string) {
   const parts = value.split(`; ${name}=`);
   if (parts.length === 2) return parts.pop()?.split(";").shift();
 }
+
+export function reorder<T>(list: T[], startIndex: number, endIndex: number) {
+  const _reorderForward = (list: T[], startIndex: number, endIndex: number) => {
+    const tmp = list[startIndex];
+    for (let i = startIndex; i < endIndex; i++) {
+      list[i] = list[i + 1];
+    }
+    list[endIndex - 1] = tmp;
+    return list;
+  };
+  const _reorderBackward = (
+    list: T[],
+    startIndex: number,
+    endIndex: number,
+  ) => {
+    for (let i = startIndex; i > endIndex; i--) {
+      list[i] = list[i - 1];
+    }
+    return list;
+  };
+
+  if (startIndex < endIndex) _reorderForward(list, startIndex, endIndex);
+  else if (startIndex > endIndex) _reorderBackward(list, startIndex, endIndex);
+  return list;
+}

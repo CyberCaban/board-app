@@ -1,70 +1,67 @@
 import { IBoardCard } from "@/types";
 import KanbanCard from "./KanbanCard";
-import { useRef } from "react";
-import { useKanbanStore } from "@/providers/kanbanProvider";
+import { MutableRefObject } from "react";
+import DropZone from "./DropZone";
 
 interface ICard {
   cards: IBoardCard[];
   column_id: string;
+  dragItem: MutableRefObject<HTMLDivElement | null>;
+  dragOverItem: MutableRefObject<HTMLDivElement | null>;
+  dragged: string | null;
+  setDragged: React.Dispatch<React.SetStateAction<string | null>>;
+  dropZone: number | null;
+  dropColumn: string | null;
 }
-export default function Cards({ cards, column_id }: ICard) {
-  const [kstore] = useKanbanStore((state) => state);
-  const dragItem = useRef<IBoardCard | null>(null);
-  const dragOverItem = useRef<IBoardCard | null>(null);
-  const onDragStart = (
-    event: React.DragEvent<HTMLDivElement>,
-    card: IBoardCard,
-  ) => {
-    console.log("start", card);
-    dragItem.current = card;
-  };
-
-  const onDragEnter = (
-    event: React.DragEvent<HTMLDivElement>,
-    card: IBoardCard,
-  ) => {
-    console.log("enter", card);
-    dragOverItem.current = card;
-  };
-  const onDragEnd = (e: React.DragEvent<HTMLDivElement>, card: IBoardCard) => {
-    e.preventDefault();
-    console.log("end", card, dragOverItem.current);
-    if (
-      !dragOverItem.current ||
-      !dragItem.current ||
-      dragOverItem.current.column_id !== dragItem.current.column_id ||
-      dragItem.current.id === dragOverItem.current.id
-    )
-      return;
-    kstore.swapCards(dragItem.current.id, dragOverItem.current.id, column_id);
-    document.startViewTransition();
-    dragItem.current = null;
-    dragOverItem.current = null;
-  };
-  // const onDragLeave = (
-  //   event: React.DragEvent<HTMLDivElement>,
-  //   card: IBoardCard,
-  // ) => {
-  //   event.preventDefault();
-  //   console.log("leave", card.id);
-  //   if (dragOverItem.current) dragOverItem.current = null;
-  // };
+export default function Cards({
+  cards,
+  column_id,
+  dragged,
+  setDragged,
+  dropZone,
+  dropColumn,
+}: ICard) {
+  const columnCards = cards
+    .filter((card) => card.column_id === column_id)
+    .toSorted((a, b) => a.position - b.position);
   return (
     <div className="flex flex-col gap-2">
       {cards
         .filter((card) => card.column_id === column_id)
         .toSorted((a, b) => a.position - b.position)
         .map((card) => (
-          <KanbanCard
-            key={card.id}
-            card={card}
-            draggable
-            onDragStart={(e) => onDragStart(e, card)}
-            onDragOver={(e) => onDragEnter(e, card)}
-            // onDragLeave={(e) => onDragLeave(e, card)}
-            onDragEnd={(e) => onDragEnd(e, card)}
-          />
+          <div className="flex flex-col" key={card.id}>
+            <DropZone
+              pos={card.position}
+              dragged={dragged}
+              dropZone={dropZone}
+              column_id={column_id}
+              dropColumn={dropColumn}
+            />
+            <>
+              {dragged !== card.id && (
+                <KanbanCard
+                  card={card}
+                  data-id={card.id}
+                  data-position={card.position}
+                  data-column-id={card.column_id}
+                  onDragStart={(e) => {
+                    e.preventDefault();
+                    setDragged(card.id);
+                  }}
+                  draggable
+                />
+              )}
+            </>
+          </div>
         ))}
+      <DropZone
+        pos={columnCards.length}
+        dragged={dragged}
+        dropZone={dropZone}
+        column_id={column_id}
+        dropColumn={dropColumn}
+      />
     </div>
   );
 }

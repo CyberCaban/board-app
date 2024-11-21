@@ -23,6 +23,12 @@ export type KanbanActions = {
     position: number,
   ) => void;
   swapCards: (id1: string, id2: string, column_id: string) => void;
+  reorderList: (
+    fromColumn: string,
+    toColumn: string,
+    toPos: number,
+    cardId: string,
+  ) => void;
 };
 
 export type KanbanStore = TKanban & KanbanActions;
@@ -183,6 +189,14 @@ export const createKanbanStore = (board: TKanban = defaultKanbanStore) => {
                   })
                   .catch((e) => toast.error(e.message));
               })
+              .catch((e) => toast.error(e.message));
+          },
+          reorderList: (fromColumn, toColumn,toPos, cardId) => {
+            putData(
+              `/boards/${get().id}/columns/${fromColumn}/cards/${cardId}/reorder/${toColumn}/${toPos}`,
+              {},
+            )
+              .then(() => get().requestBoard(get().id))
               .catch((e) => toast.error(e.message));
           },
         })),

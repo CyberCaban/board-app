@@ -9,6 +9,7 @@ export default function AvailableBoards() {
 
   useEffect(() => {
     ubstore.requestUserBoards().catch((e) => console.log(e.message));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (
     <>

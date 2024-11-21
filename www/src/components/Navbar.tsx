@@ -20,6 +20,7 @@ export default function Navbar() {
       console.error(err);
       store.resetUser();
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   return (

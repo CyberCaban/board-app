@@ -78,7 +78,7 @@ export default function Profile() {
       bio: "",
     })
       .then((user) => {
-        console.log(user);
+        
         store.setUser({
           id: store.id,
           username: user.username,
