@@ -32,9 +32,8 @@ export default function FileUploadForm({ refetch }: IFileUploadFormProps) {
     formData.append("filename", filename);
     formData.append("is_private", isPrivate.toString());
     postFormData("/api/file/create", formData)
-      .then((data) => {
+      .then(() => {
         setFilename("");
-        console.log(data);
         if (fileInput.current) fileInput.current.value = "";
         refetch();
         toast.success("File uploaded successfully");

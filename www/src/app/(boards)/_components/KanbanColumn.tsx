@@ -1,10 +1,15 @@
 "use client";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useKanbanStore } from "@/providers/kanbanProvider";
 import React, { useEffect, useRef, useState } from "react";
 
-interface KanbanColumnProps {
+interface KanbanColumnProps extends React.HTMLAttributes<HTMLLIElement> {
   id: string;
   title: string;
   children: React.ReactNode;
@@ -14,6 +19,7 @@ export default function KanbanColumn({
   id,
   title,
   children,
+  ...props
 }: KanbanColumnProps) {
   const [isDanglingCard, setIsDanglingCard] = useState(false);
   const cardInputRef = useRef<HTMLInputElement>(null);
@@ -31,11 +37,6 @@ export default function KanbanColumn({
     const cardsCountInColumn = kstore.cards
       .filter((card) => card.column_id === id)
       .toSorted((a, b) => b.position - a.position)[0]?.position;
-    console.log(
-      kstore.cards
-        .filter((card) => card.column_id === id)
-        .toSorted((a, b) => b.position - a.position)[0]?.position,
-    );
 
     kstore.addCard(
       cardName,
@@ -47,12 +48,23 @@ export default function KanbanColumn({
   };
 
   return (
-    <li className="flex min-w-[300px] max-w-[300px] flex-col gap-2 overflow-x-hidden overflow-y-scroll rounded-xl p-4">
+    <li
+      className="flex min-w-[300px] max-w-[300px] flex-col gap-2 overflow-x-hidden overflow-y-scroll rounded-xl p-4"
+      {...props}
+    >
       <div className="flex items-center justify-between">
         <h2 className="text-xl">{title}</h2>
-        <Button className="h-8 px-2" onClick={() => kstore.deleteColumn(id)}>
-          X
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="ml-2 h-auto w-auto self-start bg-transparent px-2 py-1 font-bold">
+            ...
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="cursor-pointer rounded-md border border-neutral-600 bg-black px-2 py-1 font-semibold text-white"
+            onClick={() => kstore.deleteColumn(id)}
+          >
+            Delete
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       {children}
       {isDanglingCard ? (

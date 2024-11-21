@@ -1,13 +1,12 @@
 "use client";
 
 import { use, useEffect, useRef, useState } from "react";
-import KanbanColumn from "../../_components/KanbanColumn";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useKanbanStore } from "@/providers/kanbanProvider";
 import { toast } from "sonner";
 import Link from "next/link";
-import Cards from "../../_components/Cards";
+import InteractiveColumns from "../../_components/InteractiveColumns";
 
 function Error({ message }: { message: string }) {
   return (
@@ -27,7 +26,7 @@ function Error({ message }: { message: string }) {
 
 type Params = Promise<{ id: string }>;
 
-export function Board(props: { params: Params }) {
+function Board(props: { params: Params }) {
   const { id } = use(props.params);
   const [kstore] = useKanbanStore((state) => state);
 
@@ -43,6 +42,7 @@ export function Board(props: { params: Params }) {
       setError(e.message);
     });
     return () => kstore.reset();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
@@ -69,11 +69,7 @@ export function Board(props: { params: Params }) {
             <p>{kstore.id}</p>
           </div>
           <ol className="flex h-[calc(100vh-200px)] w-11/12 flex-row items-start gap-4 overflow-x-scroll p-2">
-            {kstore.columns.map((column) => (
-              <KanbanColumn key={column.id} id={column.id} title={column.name}>
-                <Cards cards={kstore.cards} column_id={column.id} />
-              </KanbanColumn>
-            ))}
+            <InteractiveColumns/>
             {isDanglingColumn ? (
               <div className="min-w-60">
                 <form onSubmit={handleAddColumn}>

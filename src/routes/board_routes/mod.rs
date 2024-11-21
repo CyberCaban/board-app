@@ -821,14 +821,18 @@ pub fn boards_swap_card(
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
     let conn = &mut *conn;
-    let board_id = Uuid::try_parse(board_id)
-        .map_err(|_| return ApiError::from_message("Failed to parse board id".to_string()).to_json())?;
-    let column_id = Uuid::try_parse(column_id)
-        .map_err(|_| return ApiError::from_message("Failed to parse column id".to_string()).to_json())?;
-    let card1 = Uuid::try_parse(card1_id)
-        .map_err(|_| return ApiError::from_message("Failed to parse card 1 id".to_string()).to_json())?;
-    let card2 = Uuid::try_parse(card2_id)
-        .map_err(|_| return ApiError::from_message("Failed to parse card 2 id".to_string()).to_json())?;
+    let board_id = Uuid::try_parse(board_id).map_err(|_| {
+        return ApiError::from_message("Failed to parse board id".to_string()).to_json();
+    })?;
+    let column_id = Uuid::try_parse(column_id).map_err(|_| {
+        return ApiError::from_message("Failed to parse column id".to_string()).to_json();
+    })?;
+    let card1 = Uuid::try_parse(card1_id).map_err(|_| {
+        return ApiError::from_message("Failed to parse card 1 id".to_string()).to_json();
+    })?;
+    let card2 = Uuid::try_parse(card2_id).map_err(|_| {
+        return ApiError::from_message("Failed to parse card 2 id".to_string()).to_json();
+    })?;
     conn.transaction(|conn| {
         let _ = board_users_relation::table
             .filter(
@@ -868,6 +872,145 @@ pub fn boards_swap_card(
             .execute(conn)?;
 
         Ok::<(Uuid, Uuid), diesel::result::Error>((card1.0, card2.0))
+    })
+    .map(|cards| Json(json!(cards)))
+    .map_err(|e| (ApiError::from_error(&e).to_json()))
+}
+
+/// # PUT /boards/<board_id>/columns/<from_column_id>/cards/<card_id>/reorder
+/// Reorders the cards in the columns
+/// # Arguments
+/// * `board_id` - The id of the board
+///  * `from_column_id` - The id of the column
+/// * `card_id` - The id of the card
+/// * `cookies` - Takes the token of the user
+/// # Returns
+/// * `reordered_cards` - The reordered cards
+/// ```json
+/// [
+///     {
+///         "id": <card_id>,
+///         "column_id": <column_id>,
+///         "description": <card_description>,
+///         "position": <card_position>
+///     },
+///     ...
+/// ]
+/// ```
+#[put("/<board_id>/columns/<from_column_id>/cards/<card_id>/reorder/<to_column_id>/<to_pos>")]
+pub fn boards_reorder_cards(
+    db: &State<PSQLConnection>,
+    cookies: &CookieJar<'_>,
+    board_id: &str,
+    from_column_id: &str,
+    card_id: &str,
+    to_column_id: &str,
+    to_pos: &str,
+) -> Result<Json<Value>, Json<Value>> {
+    let mut conn = connect_db!(db);
+    let token = check_user_token!(cookies, conn);
+    let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id).map_err(|_| {
+        return ApiError::from_message("Failed to parse board id".to_string()).to_json();
+    })?;
+    let from_column_id = Uuid::try_parse(from_column_id).map_err(|_| {
+        return ApiError::from_message("Failed to parse from column id".to_string()).to_json();
+    })?;
+    let card_id = Uuid::try_parse(card_id).map_err(|_| {
+        return ApiError::from_message("Failed to parse card id".to_string()).to_json();
+    })?;
+    let to_column_id = Uuid::try_parse(to_column_id).map_err(|_| {
+        return ApiError::from_message("Failed to parse to column id".to_string()).to_json();
+    })?;
+    let to_pos = to_pos.parse::<i32>().map_err(|_| {
+        return ApiError::from_message("Failed to parse to position".to_string()).to_json();
+    })?;
+    conn.transaction(|conn| {
+        let _ = board_users_relation::table
+            .filter(
+                board_users_relation::board_id
+                    .eq(board_id)
+                    .and(board_users_relation::user_id.eq(token)),
+            )
+            .first::<BoardUsersRelation>(conn)
+            .map_err(|_| {
+                ApiError::from_message("You are not a member of this board".to_string()).to_json()
+            });
+
+        let card = column_card::table
+            .filter(
+                column_card::id
+                    .eq(card_id)
+                    .and(column_card::column_id.eq(from_column_id)),
+            )
+            .select((column_card::id, column_card::position))
+            .first::<(Uuid, i32)>(conn)?;
+        if card.1 == to_pos {
+            return Ok(card.0);
+        }
+        let from_column = board_column::table
+            .filter(board_column::id.eq(from_column_id))
+            .select(board_column::id)
+            .first::<Uuid>(conn)?;
+        let to_column = board_column::table
+            .filter(board_column::id.eq(to_column_id))
+            .select(board_column::id)
+            .first::<Uuid>(conn)?;
+
+        if from_column == to_column {
+            if card.1 < to_pos {
+                diesel::update(
+                    column_card::table.filter(
+                        column_card::column_id
+                            .eq(from_column)
+                            .ne(column_card::id.eq(card_id))
+                            .and(column_card::position.between(card.1, to_pos)),
+                    ),
+                )
+                .set(column_card::position.eq(column_card::position - 1))
+                .execute(conn)?;
+            } else if card.1 > to_pos {
+                diesel::update(
+                    column_card::table.filter(
+                        column_card::column_id
+                            .eq(from_column)
+                            .ne(column_card::id.eq(card_id))
+                            .and(column_card::position.between(to_pos, card.1)),
+                    ),
+                )
+                .set(column_card::position.eq(column_card::position + 1))
+                .execute(conn)?;
+            }
+        } else {
+            diesel::update(
+                column_card::table.filter(
+                    column_card::column_id
+                        .eq(from_column)
+                        .ne(column_card::id.eq(card_id))
+                        .and(column_card::position.gt(card.1)),
+                ),
+            )
+            .set(column_card::position.eq(column_card::position - 1))
+            .execute(conn)?;
+            diesel::update(
+                column_card::table.filter(
+                    column_card::column_id
+                        .eq(to_column)
+                        .ne(column_card::id.eq(card_id))
+                        .and(column_card::position.ge(to_pos)),
+                ),
+            )
+            .set(column_card::position.eq(column_card::position + 1))
+            .execute(conn)?;
+        }
+
+        diesel::update(column_card::table.filter(column_card::id.eq(card.0)))
+            .set((
+                column_card::column_id.eq(to_column),
+                column_card::position.eq(to_pos),
+            ))
+            .execute(conn)?;
+        Ok::<Uuid, diesel::result::Error>(card.0)
     })
     .map(|cards| Json(json!(cards)))
     .map_err(|e| (ApiError::from_error(&e).to_json()))
