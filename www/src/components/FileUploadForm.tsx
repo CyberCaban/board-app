@@ -1,7 +1,16 @@
 "use client";
 import { useRef, useState } from "react";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { toast } from "sonner";
+import { postFormData } from "@/utils/utils";
 
-export default function FileUploadForm() {
+interface IFileUploadFormProps {
+  refetch: () => void;
+}
+
+export default function FileUploadForm({ refetch }: IFileUploadFormProps) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [filename, setFilename] = useState<string>("");
   const [isPrivate, setIsPrivate] = useState<boolean>(false);
@@ -22,17 +31,16 @@ export default function FileUploadForm() {
     formData.append("file", file);
     formData.append("filename", filename);
     formData.append("is_private", isPrivate.toString());
-    fetch("/api/file/create", {
-      method: "POST",
-      body: formData,
-    })
-      .then((response) => response.json())
+    postFormData("/api/file/create", formData)
       .then((data) => {
         setFilename("");
         console.log(data);
         if (fileInput.current) fileInput.current.value = "";
+        refetch();
+        toast.success("File uploaded successfully");
       })
       .catch((error) => {
+        toast.error(`Error uploading file: ${error.message}`);
         console.error(error);
       });
   };
@@ -40,22 +48,26 @@ export default function FileUploadForm() {
   return (
     <form className="upload-form" onSubmit={handleSubmit}>
       <h1>Upload File</h1>
-      <input type="file" ref={fileInput} onChange={handleFileChange} />
-      <input
+      <Input type="file" ref={fileInput} onChange={handleFileChange} />
+      <Input
         type="text"
         value={filename}
         onChange={(e) => setFilename(e.target.value)}
         placeholder="Filename"
       />
-      <label>
-        Private
-        <input
+      <div className="flex flex-row align-start items-center h-6">
+        <Label htmlFor="private" className="text-base">
+          Private
+        </Label>
+        <Input
+          id="private"
+          className="ml-4 w-6"
           type="checkbox"
           checked={isPrivate}
-          onChange={(e) => setIsPrivate(e.target.checked)}
+          onChange={(checked) => setIsPrivate(checked.target.checked)}
         />
-      </label>
-      <button type="submit">Upload File</button>
+      </div>
+      <Button type="submit">Upload File</Button>
     </form>
   );
 }

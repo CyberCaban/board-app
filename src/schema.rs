@@ -17,6 +17,10 @@ diesel::table! {
         username -> Varchar,
         #[max_length = 255]
         password -> Varchar,
+        #[max_length = 255]
+        profile_url -> Nullable<Varchar>,
+        #[max_length = 255]
+        bio -> Nullable<Varchar>,
     }
 }
 
