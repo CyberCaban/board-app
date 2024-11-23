@@ -27,11 +27,22 @@ diesel::table! {
 }
 
 diesel::table! {
+    card_attachments (file_id, card_id) {
+        file_id -> Uuid,
+        card_id -> Uuid,
+    }
+}
+
+diesel::table! {
     column_card (id, column_id) {
         id -> Uuid,
         column_id -> Uuid,
         description -> Nullable<Text>,
         position -> Int4,
+        #[max_length = 255]
+        name -> Varchar,
+        #[max_length = 255]
+        cover_attachment -> Nullable<Varchar>,
     }
 }
 
@@ -63,6 +74,7 @@ diesel::joinable!(board_column -> boards (board_id));
 diesel::joinable!(board_users_relation -> boards (board_id));
 diesel::joinable!(board_users_relation -> users (user_id));
 diesel::joinable!(boards -> users (creator_id));
+diesel::joinable!(card_attachments -> files (file_id));
 diesel::joinable!(column_card -> board_column (column_id));
 diesel::joinable!(files -> users (user_id));
 
@@ -70,6 +82,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     board_column,
     board_users_relation,
     boards,
+    card_attachments,
     column_card,
     files,
     users,

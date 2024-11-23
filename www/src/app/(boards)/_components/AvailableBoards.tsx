@@ -2,14 +2,17 @@
 
 import { useUserBoardsStore } from "@/providers/userBoardsProvider";
 import Link from "next/link";
-import { useEffect, } from "react";
+import { useEffect } from "react";
 
 export default function AvailableBoards() {
   const ubstore = useUserBoardsStore((state) => state);
 
   useEffect(() => {
-    ubstore.requestUserBoards().catch((e) => console.log(e.message));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    ubstore.requestUserBoards().catch((e) => {
+      console.log(e.message);
+      ubstore.resetUserBoards();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (
     <>

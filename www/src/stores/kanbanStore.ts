@@ -14,7 +14,7 @@ export type KanbanActions = {
   addColumn: (name: string, position: number) => void;
   deleteColumn: (id: string) => void;
   updateColumn: (id: string, name: string, position: number) => void;
-  addCard: (description: string, column_id: string, position: number) => void;
+  addCard: (name: string, column_id: string, position: number) => void;
   deleteCard: (id: string, column_id: string) => void;
   updateCard: (
     id: string,
@@ -101,12 +101,13 @@ export const createKanbanStore = (board: TKanban = defaultKanbanStore) => {
               .catch((e) => toast.error(e.message));
           },
           addCard: (
-            description: string,
+            name: string,
             column_id: string,
             position: number,
           ) => {
             postData(`/boards/${get().id}/columns/${column_id}/cards`, {
-              description,
+              name,
+              description: "",
               column_id,
               position,
             })

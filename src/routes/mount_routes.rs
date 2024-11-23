@@ -1,7 +1,7 @@
 use crate::database::PSQLConnection as Conn;
 use rocket::{fs::FileServer, Build, Rocket};
 
-use super::{file_routes, routes, AuthorizationRoutes, board_routes};
+use super::{file_routes, routes, AuthorizationRoutes, board_routes::*};
 
 impl AuthorizationRoutes for Rocket<Build> {
     fn mount_auth_routes(self) -> Self {
@@ -24,27 +24,27 @@ impl AuthorizationRoutes for Rocket<Build> {
 
     fn mount_board_routes(self) -> Self {
         self.mount("/boards", routes![
-            board_routes::boards_create_board_and_relation,
-            board_routes::boards_get_boards,
-            board_routes::boards_get_board,
-            board_routes::boards_update_board,
-            board_routes::boards_delete_board,
-            board_routes::boards_create_column,
-            board_routes::boards_get_columns,
-            board_routes::boards_get_column,
-            board_routes::boards_update_column,
-            board_routes::boards_delete_column,
-            board_routes::boards_create_card,
-            board_routes::boards_get_cards,
-            board_routes::boards_get_card,
-            board_routes::boards_update_card,
-            board_routes::boards_delete_card,
-            board_routes::boards_add_collaborator,
-            board_routes::boards_get_collaborators,
-            board_routes::boards_get_collaborator,
-            board_routes::boards_remove_collaborator,
-            board_routes::boards_swap_card,
-            board_routes::boards_reorder_cards
+            base_actions::boards_create_board_and_relation,
+            base_actions::boards_get_boards,
+            base_actions::boards_get_board,
+            base_actions::boards_update_board,
+            base_actions::boards_delete_board,
+            column_actions::boards_create_column,
+            column_actions::boards_get_columns,
+            column_actions::boards_get_column,
+            column_actions::boards_update_column,
+            column_actions::boards_delete_column,
+            card_actions::boards_create_card,
+            card_actions::boards_get_cards,
+            card_actions::boards_get_card,
+            card_actions::boards_update_card,
+            card_actions::boards_delete_card,
+            card_actions::boards_swap_card,
+            card_actions::boards_reorder_cards,
+            collaborator_actions::boards_add_collaborator,
+            collaborator_actions::boards_get_collaborators,
+            collaborator_actions::boards_get_collaborator,
+            collaborator_actions::boards_remove_collaborator,
         ],)
     }
 

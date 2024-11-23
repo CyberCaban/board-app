@@ -13,7 +13,7 @@ export interface IBoardColumn {
 
 export interface IBoardCard {
   id: string;
-  description: string;
+  name: string;
   column_id: string;
   position: number;
 }

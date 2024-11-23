@@ -31,7 +31,7 @@ export default function KanbanCard({
       {...props}
     >
       <p className="line-clamp-3 overflow-x-auto break-words">
-        {card.description}
+        {card.name}
       </p>
       <DropdownMenu>
         <DropdownMenuTrigger className="ml-2 h-auto w-auto self-start bg-transparent px-2 py-1 font-bold">

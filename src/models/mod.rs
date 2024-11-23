@@ -1,5 +1,8 @@
 use diesel::{Insertable, Queryable, QueryableByName, Selectable};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+use crate::schema::column_card;
 
 #[derive(Serialize, Deserialize)]
 pub struct PubUser {
@@ -89,21 +92,39 @@ pub struct SwapCards<'a> {
 #[derive(Serialize, Deserialize)]
 pub struct PubCard {
     pub id: uuid::Uuid,
+    pub name: String,
+    pub cover_attachment: Option<String>,
     pub position: i32,
     pub description: Option<String>,
     pub column_id: uuid::Uuid,
 }
 #[derive(Serialize, Deserialize)]
-pub struct NewCard<'a> {
-    pub name: Option<&'a str>,
+pub struct NewCard {
+    pub name: String,
     pub position: i32,
     pub description: Option<String>,
 }
-pub type ReturnedCard = (uuid::Uuid, uuid::Uuid, Option<String>, i32);
+pub const SELECT_CARD: (
+    column_card::id,
+    column_card::name,
+    column_card::cover_attachment,
+    column_card::position,
+    column_card::description,
+    column_card::column_id,
+) = (
+    column_card::id,
+    column_card::name,
+    column_card::cover_attachment,
+    column_card::position,
+    column_card::description,
+    column_card::column_id,
+);
+pub type ReturnedCard = (Uuid, String, Option<String>, i32, Option<String>, Uuid);
 #[derive(Insertable, Queryable, Selectable, Serialize, Deserialize)]
 #[diesel(table_name = crate::schema::column_card)]
 pub struct ColumnCard {
     pub id: Option<uuid::Uuid>,
+    pub name: String,
     pub column_id: uuid::Uuid,
     pub position: i32,
     pub description: Option<String>,
