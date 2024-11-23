@@ -83,6 +83,7 @@ export default function InteractiveColumns() {
                   ? dropZone
                   : dropZone - 1
                 : dropZone;
+            document.startViewTransition();
             kstore.reorderList(
               dCard!.column_id,
               dropColumn!,

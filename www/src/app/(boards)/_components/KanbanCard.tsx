@@ -19,7 +19,9 @@ export default function KanbanCard({
   ...props
 }: KanbanCardProps) {
   const [kstore] = useKanbanStore((state) => state);
-  const onDelete = () => {
+  const onDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     document.startViewTransition();
     kstore.deleteCard(card.id, card.column_id);
   };

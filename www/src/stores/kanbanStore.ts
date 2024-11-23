@@ -14,14 +14,17 @@ export type KanbanActions = {
   addColumn: (name: string, position: number) => void;
   deleteColumn: (id: string) => void;
   updateColumn: (id: string, name: string, position: number) => void;
-  requestCard: (board_id: string, id: string) => Promise<void>;
+  requestCardModal: (board_id: string, id: string) => Promise<void>;
+  resetCardModal: () => void;
   addCard: (name: string, column_id: string, position: number) => void;
   deleteCard: (id: string, column_id: string) => void;
   updateCard: (
     id: string,
+    name: string,
+    cover_attachment: string,
     description: string,
     column_id: string,
-    position: number,
+    attachments: string[],
   ) => void;
   swapCards: (id1: string, id2: string, column_id: string) => void;
   reorderList: (
@@ -102,13 +105,14 @@ export const createKanbanStore = (board: TKanban = defaultKanbanStore) => {
               })
               .catch((e) => toast.error(e.message));
           },
-          requestCard: (board_id: string, id: string) =>
+          requestCardModal: (board_id: string, id: string) =>
             getData(`/boards/${board_id}/cards/${id}`).then((res) => {
               set((prev) => ({
                 ...prev,
                 cardModal: res,
               }));
             }),
+          resetCardModal: () => set({ cardModal: undefined }),
           addCard: (name: string, column_id: string, position: number) => {
             postData(`/boards/${get().id}/columns/${column_id}/cards`, {
               name,
@@ -142,14 +146,16 @@ export const createKanbanStore = (board: TKanban = defaultKanbanStore) => {
           },
           updateCard: (
             id: string,
+            name: string,
+            cover_attachment: string,
             description: string,
             column_id: string,
-            position: number,
+            // attachments: string[],
           ) => {
             putData(`/boards/${get().id}/columns/${column_id}/cards/${id}`, {
+              name,
               description,
-              column_id,
-              position,
+              cover_attachment,
             })
               .then(() => {
                 getData(`/boards/${get().id}/columns/${column_id}/cards/${id}`)
@@ -162,6 +168,7 @@ export const createKanbanStore = (board: TKanban = defaultKanbanStore) => {
                         }
                         return card;
                       }),
+                      cardModal: res,
                     }));
                   })
                   .catch((e) => toast.error(e.message));

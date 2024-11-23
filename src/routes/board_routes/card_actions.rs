@@ -7,7 +7,7 @@ use crate::{
     check_user_token, connect_db,
     database::PSQLConnection,
     errors::{ApiError, ApiErrorType},
-    models::{BoardUsersRelation, ColumnCard, NewCard, PubCard, ReturnedCard, SELECT_CARD},
+    models::{BoardUsersRelation, CardInfo, ColumnCard, NewCard, PubCard, ReturnedCard, SELECT_CARD},
     schema::{board_column, board_users_relation, column_card},
 };
 
@@ -288,7 +288,7 @@ pub fn boards_update_card(
     board_id: &str,
     column_id: &str,
     card_id: &str,
-    card: Json<NewCard>,
+    card: Json<CardInfo>,
 ) -> Result<Json<Value>, Json<Value>> {
     let mut conn = connect_db!(db);
     let token = check_user_token!(cookies, conn);
@@ -303,16 +303,16 @@ pub fn boards_update_card(
                     .and(board_users_relation::user_id.eq(token)),
             )
             .first::<BoardUsersRelation>(conn)?;
-        let column = board_column::table
+        let _ = board_column::table
             .filter(board_column::id.eq(Uuid::parse_str(column_id).unwrap()))
             .select(board_column::id)
             .first::<Uuid>(conn)?;
         let card = diesel::update(column_card::table)
             .filter(column_card::id.eq(Uuid::parse_str(card_id).unwrap()))
             .set((
-                column_card::column_id.eq(column),
+                column_card::name.eq(card.name.clone()),
+                column_card::cover_attachment.eq(card.cover_attachment.clone()),
                 column_card::description.eq(card.description.clone()),
-                column_card::position.eq(card.position),
             ))
             .returning(SELECT_CARD)
             .get_result::<ReturnedCard>(conn)?;

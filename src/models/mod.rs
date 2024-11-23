@@ -104,6 +104,12 @@ pub struct NewCard {
     pub position: i32,
     pub description: Option<String>,
 }
+#[derive(Serialize, Deserialize)]
+pub struct CardInfo {
+    pub name: String,
+    pub cover_attachment: Option<String>,
+    pub description: String,
+}
 pub const SELECT_CARD: (
     column_card::id,
     column_card::name,

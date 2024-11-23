@@ -31,19 +31,20 @@ export default function EditCard({
   const [kstore] = useKanbanStore((state) => state);
 
   useEffect(() => {
-    kstore.requestCard(board_id, card_id).catch((e) => {
+    kstore.requestCardModal(board_id, card_id).catch((e) => {
       console.log(e);
       toast.error(e.message);
     });
+    return () => kstore.resetCardModal();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      cardName: kstore.cardModal?.name,
-      cardDescription: kstore.cardModal?.description,
-    },
+    // defaultValues: {
+    //   cardName: kstore.cardModal?.name,
+    //   cardDescription: kstore.cardModal?.description,
+    // },
     values: {
       cardName: kstore.cardModal?.name || "",
       cardDescription: kstore.cardModal?.description || "",
@@ -52,47 +53,61 @@ export default function EditCard({
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      console.log(values);
+      if (!kstore.cardModal) return;
+      document.startViewTransition();
+      kstore.updateCard(
+        card_id,
+        values.cardName,
+        "",
+        values.cardDescription,
+        kstore.cardModal.column_id,
+        [],
+      );
     } catch (error) {
       console.error("Form submission error", error);
     }
   }
 
   return (
-    <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className="mx-auto max-w-3xl space-y-8 py-10"
-      >
-        <FormField
-          control={form.control}
-          name="cardName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Card Name</FormLabel>
-              <FormControl>
-                <Input placeholder="shadcn" type="text" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="cardDescription"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description</FormLabel>
-              <FormControl>
-                <Textarea className="resize-none" {...field} />
-              </FormControl>
-
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <Button type="submit">Save</Button>
-      </form>
-    </Form>
+    <div className="flex flex-col items-center">
+      <Form {...form}>
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="w-full max-w-2xl space-y-4"
+        >
+          <FormField
+            control={form.control}
+            name="cardName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Card Name</FormLabel>
+                <FormControl>
+                  <Input className="line-clamp-3" placeholder="Enter card name" type="text" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="cardDescription"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Description</FormLabel>
+                <FormControl>
+                  <Textarea
+                    className="resize-none px-4 py-2 h-40"
+                    placeholder="Description"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button type="submit">Save</Button>
+        </form>
+      </Form>
+    </div>
   );
 }
