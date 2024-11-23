@@ -18,6 +18,16 @@ export interface IBoardCard {
   position: number;
 }
 
+export interface ICard {
+  id: string;
+  name: string;
+  cover_attachment: string;
+  description: string;
+  column_id: string;
+  position: number;
+  attachments: string[];
+}
+
 export interface IBoard {
   id: string;
   name: string;

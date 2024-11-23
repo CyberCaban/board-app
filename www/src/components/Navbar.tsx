@@ -9,22 +9,24 @@ export default function Navbar() {
   const [store] = useUserStore((state) => state);
 
   useEffect(() => {
-    getData("/api/user").then((res) => {
-      store.setUser({
-        id: res.id,
-        username: res.username,
-        profile_url: res.profile_url,
+    getData("/api/user", { cache: "force-cache" })
+      .then((res) => {
+        store.setUser({
+          id: res.id,
+          username: res.username,
+          profile_url: res.profile_url,
+        });
+        console.log(res);
+      })
+      .catch((err) => {
+        console.error(err);
+        store.resetUser();
       });
-      console.log(res);
-    }).catch(err => {
-      console.error(err);
-      store.resetUser();
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
+
   return (
-    <nav className="flex flex-row bg-foreground p-4 gap-4 justify-between">
+    <nav className="flex flex-row justify-between gap-4 bg-foreground p-4">
       <div className="left_pad flex flex-row gap-4">
         <Link href="/">Home</Link>
         <Link href="/register">Register</Link>

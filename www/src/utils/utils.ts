@@ -46,8 +46,8 @@ export async function putData(url: string, data: unknown) {
     });
 }
 
-export async function getData(url: string) {
-  return fetch(url)
+export async function getData(url: string, fetchOptions?: RequestInit) {
+  return fetch(url, fetchOptions)
     .then((response) => response.json())
     .then((res) => {
       if (res.error_msg) {

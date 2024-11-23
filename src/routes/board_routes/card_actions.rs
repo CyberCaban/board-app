@@ -7,10 +7,7 @@ use crate::{
     check_user_token, connect_db,
     database::PSQLConnection,
     errors::{ApiError, ApiErrorType},
-    models::{
-        BoardUsersRelation, ColumnCard, NewCard,
-        PubCard, ReturnedCard, SELECT_CARD,
-    },
+    models::{BoardUsersRelation, ColumnCard, NewCard, PubCard, ReturnedCard, SELECT_CARD},
     schema::{board_column, board_users_relation, column_card},
 };
 
@@ -203,6 +200,65 @@ pub fn boards_get_card(
             description: card.4,
             column_id: card.5
         }))
+    })
+    .map_err(|e| (ApiError::from_error(&e).to_json()))
+}
+
+/// # GET /boards/<board_id>/cards/<card_id>
+/// Returns the card with the given id
+/// # Arguments
+/// * `board_id` - The id of the board
+/// * `card_id` - The id of the card
+/// * `cookies` - Takes the token of the user
+/// # Returns
+/// * `card` - The card
+/// ```json
+/// {
+///     "id": <card_id>,
+///     "column_id": <column_id>,
+///     "description": <card_description>,
+///     "position": <card_position>
+/// }
+/// ```
+#[get("/<board_id>/cards/<card_id>")]
+pub fn boards_get_card_by_id(
+    db: &State<PSQLConnection>,
+    cookies: &CookieJar<'_>,
+    board_id: &str,
+    card_id: &str,
+) -> Result<Json<Value>, Json<Value>> {
+    let mut conn = connect_db!(db);
+    let token = check_user_token!(cookies, conn);
+    let conn = &mut *conn;
+    let board_id = Uuid::try_parse(board_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
+    let card_id = Uuid::try_parse(card_id)
+        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
+    conn.transaction(|conn| {
+        let _ = board_users_relation::table
+            .filter(
+                board_users_relation::board_id
+                    .eq(board_id)
+                    .and(board_users_relation::user_id.eq(token)),
+            )
+            .first::<BoardUsersRelation>(conn)?;
+        let card = column_card::table
+            .filter(column_card::id.eq(card_id))
+            .select(SELECT_CARD)
+            .first::<ReturnedCard>(conn)?;
+        let card = PubCard {
+            id: card.0,
+            name: card.1,
+            cover_attachment: card.2,
+            position: card.3,
+            description: card.4,
+            column_id: card.5
+        };
+
+        Ok::<PubCard, diesel::result::Error>(card)
+    })
+    .map(|card| {
+        Json(json!(card))
     })
     .map_err(|e| (ApiError::from_error(&e).to_json()))
 }

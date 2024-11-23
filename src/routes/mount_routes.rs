@@ -41,6 +41,7 @@ impl AuthorizationRoutes for Rocket<Build> {
             card_actions::boards_delete_card,
             card_actions::boards_swap_card,
             card_actions::boards_reorder_cards,
+            card_actions::boards_get_card_by_id,
             collaborator_actions::boards_add_collaborator,
             collaborator_actions::boards_get_collaborators,
             collaborator_actions::boards_get_collaborator,

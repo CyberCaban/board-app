@@ -1,10 +1,10 @@
-import { IBoard, IBoardCard } from "@/types";
+import { IBoard, IBoardCard, ICard } from "@/types";
 import { deleteData, getData, postData, putData } from "@/utils/utils";
 import { toast } from "sonner";
 import { createStore } from "zustand";
 import { devtools, persist, subscribeWithSelector } from "zustand/middleware";
 
-export type TKanban = IBoard;
+export type TKanban = IBoard & { cardModal?: ICard };
 
 export type KanbanActions = {
   requestBoard: (id: string) => Promise<void>;
@@ -14,6 +14,7 @@ export type KanbanActions = {
   addColumn: (name: string, position: number) => void;
   deleteColumn: (id: string) => void;
   updateColumn: (id: string, name: string, position: number) => void;
+  requestCard: (board_id: string, id: string) => Promise<void>;
   addCard: (name: string, column_id: string, position: number) => void;
   deleteCard: (id: string, column_id: string) => void;
   updateCard: (
@@ -38,6 +39,7 @@ export const initKanbanStore = (): TKanban => ({
   name: "",
   columns: [],
   cards: [],
+  cardModal: undefined,
 });
 
 export const defaultKanbanStore = initKanbanStore();
@@ -100,11 +102,14 @@ export const createKanbanStore = (board: TKanban = defaultKanbanStore) => {
               })
               .catch((e) => toast.error(e.message));
           },
-          addCard: (
-            name: string,
-            column_id: string,
-            position: number,
-          ) => {
+          requestCard: (board_id: string, id: string) =>
+            getData(`/boards/${board_id}/cards/${id}`).then((res) => {
+              set((prev) => ({
+                ...prev,
+                cardModal: res,
+              }));
+            }),
+          addCard: (name: string, column_id: string, position: number) => {
             postData(`/boards/${get().id}/columns/${column_id}/cards`, {
               name,
               description: "",
