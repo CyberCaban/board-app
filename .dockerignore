@@ -3,7 +3,7 @@ target
 
 ./www/dist
 ./www/node_modules
-.next
+./www/.next
 
 ./tmp/*
 !./tmp/.gitkeep
