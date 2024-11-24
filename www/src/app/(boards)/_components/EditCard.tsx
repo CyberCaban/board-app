@@ -54,7 +54,7 @@ export default function EditCard({
   function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       if (!kstore.cardModal) return;
-      document.startViewTransition();
+      if (document.startViewTransition) document.startViewTransition();
       kstore.updateCard(
         card_id,
         values.cardName,

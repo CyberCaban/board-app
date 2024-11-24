@@ -22,7 +22,7 @@ export default function KanbanCard({
   const onDelete = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    document.startViewTransition();
+    if (document.startViewTransition) document.startViewTransition();
     kstore.deleteCard(card.id, card.column_id);
   };
   return (
