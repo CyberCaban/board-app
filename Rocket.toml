@@ -1,0 +1,7 @@
+[default]
+address = "127.0.0.1"
+port = 8000
+workers = 16
+keep_alive = 5
+ident = "Rocket"
+log_level = "normal"

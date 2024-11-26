@@ -1,5 +1,6 @@
 use rocket::serde::json::Json;
 use serde_json::{json, Value};
+use diesel::result::Error as DieselError;
 
 #[derive(serde::Serialize)]
 pub enum ApiErrorType {
@@ -10,6 +11,7 @@ pub enum ApiErrorType {
     UserNotFound,
     YouDoNotOwnThisFile,
     FailedToParseUUID,
+    NotFound,
 }
 
 impl ToString for ApiErrorType {
@@ -22,6 +24,7 @@ impl ToString for ApiErrorType {
             ApiErrorType::UserNotFound => "User Not Found".to_string(),
             ApiErrorType::YouDoNotOwnThisFile => "You do not own this file".to_string(),
             ApiErrorType::FailedToParseUUID => "Failed to parse UUID".to_string(),
+            ApiErrorType::NotFound => "Not Found".to_string(),
         }
     }
 }
@@ -46,7 +49,7 @@ impl ApiError {
             error_msg: message,
         }
     }
-    pub fn from_error(error: &impl std::error::Error) -> Self {
+    pub fn from_error<E: std::error::Error + 'static>(error: E) -> Self {
         eprintln!("Error: {}", error);
         ApiError {
             error_type: "Internal Server Error".to_string(),
@@ -71,6 +74,24 @@ impl ApiError {
     }
 }
 
+impl From<DieselError> for ApiError {
+    fn from(error: DieselError) -> Self {
+        match error {
+            DieselError::NotFound => ApiError::from_type(ApiErrorType::NotFound),
+            _ => ApiError::from_message(error.to_string()),
+        }
+    }
+}
+
+impl From<ApiError> for DieselError {
+    fn from(error: ApiError) -> Self {
+        DieselError::DatabaseError(
+            diesel::result::DatabaseErrorKind::Unknown, 
+            Box::new(error.error_msg)
+        )
+    }
+}
+
 #[derive(serde::Serialize)]
 enum ApiResponse {
     Ok,
@@ -82,6 +103,7 @@ pub enum RegisterError {
     EmptyUsername,
     UserAlreadyExists,
     WeakPassword,
+    EmptyPassword,
 }
 impl ToString for RegisterError {
     fn to_string(&self) -> String {
@@ -89,18 +111,23 @@ impl ToString for RegisterError {
             RegisterError::UserAlreadyExists => "UserAlreadyExists".to_string(),
             RegisterError::WeakPassword => "WeakPassword".to_string(),
             RegisterError::EmptyUsername => "EmptyUsername".to_string(),
+            RegisterError::EmptyPassword => "EmptyPassword".to_string(),
         }
     }
 }
 pub enum LoginError {
     UserNotFound,
     WrongPassword,
+    EmptyPassword,
+    EmptyUsername,
 }
 impl ToString for LoginError {
     fn to_string(&self) -> String {
         match self {
             LoginError::UserNotFound => "UserNotFound".to_string(),
             LoginError::WrongPassword => "WrongPassword".to_string(),
+            LoginError::EmptyPassword => "EmptyPassword".to_string(),
+            LoginError::EmptyUsername => "EmptyUsername".to_string(),
         }
     }
 }
