@@ -1,4 +1,3 @@
-use crate::database::PSQLConnection as Conn;
 use rocket::{fs::FileServer, Build, Rocket};
 
 use super::{file_routes, routes, AuthorizationRoutes, board_routes::*};
@@ -39,9 +38,11 @@ impl AuthorizationRoutes for Rocket<Build> {
             card_actions::boards_get_card,
             card_actions::boards_update_card,
             card_actions::boards_delete_card,
-            card_actions::boards_swap_card,
             card_actions::boards_reorder_cards,
-            card_actions::boards_get_card_by_id,
+            card_editing::boards_get_card_by_id,
+            card_editing::boards_add_attachment_to_card,
+            card_editing::boards_get_attachments_of_card,
+            card_editing::boards_delete_attachment_of_card,
             collaborator_actions::boards_add_collaborator,
             collaborator_actions::boards_get_collaborators,
             collaborator_actions::boards_get_collaborator,
@@ -55,9 +56,5 @@ impl AuthorizationRoutes for Rocket<Build> {
 
     fn mount_uploads(self) -> Self {
         self.mount("/uploads", FileServer::from("tmp").rank(1))
-    }
-
-    fn manage_db(self) -> Self {
-        self.manage(Conn::new())
     }
 }

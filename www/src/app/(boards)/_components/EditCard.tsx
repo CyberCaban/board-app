@@ -16,6 +16,10 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import UploadAttachment from "./UploadAttachment";
+import DisplayAttachments from "./DisplayAttachments";
+import { deleteData } from "@/utils/utils";
+import { Label } from "@/components/ui/label";
 const formSchema = z.object({
   cardName: z.string(),
   cardDescription: z.string(),
@@ -58,18 +62,45 @@ export default function EditCard({
       kstore.updateCard(
         card_id,
         values.cardName,
-        "",
         values.cardDescription,
         kstore.cardModal.column_id,
-        [],
       );
     } catch (error) {
       console.error("Form submission error", error);
     }
   }
 
+  const handleDelete = (attachment_id: string) => {
+    deleteData(
+      `/boards/${board_id}/cards/${card_id}/attachments/${attachment_id}`,
+    )
+      .then(() => kstore.requestCardModal(board_id, card_id))
+      .catch((e) => toast.error(e.message));
+  };
+
+  const update = () => {
+    kstore.requestCardModal(board_id, card_id).catch((e) => {
+      console.log(e);
+      toast.error(e.message);
+    });
+  };
+
   return (
     <div className="flex flex-col items-center">
+      <div className="flex flex-col gap-4 max-w-md">
+        <Label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          Attachments
+        </Label>
+        <DisplayAttachments
+          attachments={kstore.cardModal?.attachments}
+          handleDelete={handleDelete}
+        />
+        <UploadAttachment
+          board_id={board_id}
+          card_id={card_id}
+          update={update}
+        />
+      </div>
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
@@ -82,7 +113,12 @@ export default function EditCard({
               <FormItem>
                 <FormLabel>Card Name</FormLabel>
                 <FormControl>
-                  <Input className="line-clamp-3" placeholder="Enter card name" type="text" {...field} />
+                  <Input
+                    className="line-clamp-3"
+                    placeholder="Enter card name"
+                    type="text"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -96,7 +132,7 @@ export default function EditCard({
                 <FormLabel>Description</FormLabel>
                 <FormControl>
                   <Textarea
-                    className="resize-none px-4 py-2 h-40"
+                    className="h-40 resize-none px-4 py-2"
                     placeholder="Description"
                     {...field}
                   />

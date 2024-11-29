@@ -7,6 +7,8 @@ import { useKanbanStore } from "@/providers/kanbanProvider";
 import { toast } from "sonner";
 import Link from "next/link";
 import InteractiveColumns from "../../_components/InteractiveColumns";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useRouter } from "next/navigation";
 
 function Error({ message }: { message: string }) {
   return (
@@ -27,6 +29,7 @@ function Error({ message }: { message: string }) {
 type Params = Promise<{ id: string }>;
 
 function Board(props: { params: Params }) {
+  const router = useRouter();
   const { id } = use(props.params);
   const [kstore] = useKanbanStore((state) => state);
 
@@ -65,7 +68,26 @@ function Board(props: { params: Params }) {
       {kstore.id && (
         <div>
           <div>
-            <h1>{kstore.name}</h1>
+            <div className="flex flex-row items-center gap-4">
+              <h1>{kstore.name}</h1>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="bg-black">...</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <Button
+                    onClick={() => {
+                      kstore
+                        .deleteBoard()
+                        .then(() => router.replace("/board"))
+                        .catch((e) => toast.error(e.message));
+                    }}
+                  >
+                    Delete board
+                  </Button>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             <p>{kstore.id}</p>
           </div>
           <ol className="flex h-[calc(100vh-200px)] w-11/12 flex-row items-start gap-4 overflow-x-scroll p-2">

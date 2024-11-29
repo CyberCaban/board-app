@@ -1,14 +1,20 @@
 use diesel::{BoolExpressionMethods, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
-use rocket::{http::CookieJar, serde::json::Json, State};
-use serde_json::{json, Value};
+use rocket::{
+    http::CookieJar,
+    serde::json::{json, Json},
+};
+use serde_json::Value;
 use uuid::Uuid;
 
 use crate::{
-    check_user_token, connect_db,
-    database::PSQLConnection,
+    database::Db,
     errors::{ApiError, ApiErrorType},
-    models::{BoardUsersRelation, CardInfo, ColumnCard, NewCard, PubCard, ReturnedCard, SELECT_CARD},
-    schema::{board_column, board_users_relation, column_card},
+    models::{
+        BoardUsersRelation, CardInfo, ColumnCard, NewCard, PubAttachment, PubCard, ReturnedCard,
+        SELECT_CARD,
+    },
+    schema::{board_column, board_users_relation, card_attachments, column_card, files},
+    validate_user_token,
 };
 
 /// # POST /boards/<board_id>/columns/<column_id>/cards
@@ -29,45 +35,50 @@ use crate::{
 /// }
 /// ```
 #[post("/<board_id>/columns/<column_id>/cards", data = "<card>")]
-pub fn boards_create_card(
-    db: &State<PSQLConnection>,
+pub async fn boards_create_card(
+    db: Db,
     cookies: &CookieJar<'_>,
-    board_id: &str,
-    column_id: &str,
+    board_id: String,
+    column_id: String,
     card: Json<NewCard>,
 ) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
-    let board_id = Uuid::try_parse(board_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    conn.transaction(|conn| {
-        let _ = board_users_relation::table
-            .filter(
-                board_users_relation::board_id
-                    .eq(board_id)
-                    .and(board_users_relation::user_id.eq(token)),
-            )
-            .first::<BoardUsersRelation>(conn)?;
-        let column = board_column::table
-            .filter(board_column::id.eq(Uuid::parse_str(column_id).unwrap()))
-            .select(board_column::id)
-            .first::<Uuid>(conn)?;
-        let card = diesel::insert_into(column_card::table)
-            .values(ColumnCard {
-                id: None,
-                name: card.name.clone(),
-                column_id: column,
-                position: card.position,
-                description: card
-                    .description
-                    .clone()
-                    .map(|description| description.to_string()),
-            })
-            .returning(SELECT_CARD)
-            .get_result::<ReturnedCard>(conn)?;
-        Ok::<ReturnedCard, diesel::result::Error>(card)
+    let token = validate_user_token!(cookies);
+
+    db.run(move |conn| {
+        conn.transaction(|conn| {
+            let board_id = Uuid::try_parse(&board_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+            let column_id = Uuid::try_parse(&column_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+
+            let _ = board_users_relation::table
+                .filter(
+                    board_users_relation::board_id
+                        .eq(board_id)
+                        .and(board_users_relation::user_id.eq(token)),
+                )
+                .first::<BoardUsersRelation>(conn)?;
+
+            let column = board_column::table
+                .filter(board_column::id.eq(column_id))
+                .select(board_column::id)
+                .first::<Uuid>(conn)?;
+
+            let card = diesel::insert_into(column_card::table)
+                .values(ColumnCard {
+                    id: None,
+                    name: card.name.clone(),
+                    column_id: column,
+                    position: card.position,
+                    description: card.description.clone(),
+                })
+                .returning(SELECT_CARD)
+                .get_result::<ReturnedCard>(conn)?;
+
+            Ok::<ReturnedCard, diesel::result::Error>(card)
+        })
     })
+    .await
     .map(|card| {
         Json(json!(PubCard {
             id: card.0,
@@ -78,7 +89,7 @@ pub fn boards_create_card(
             column_id: card.5
         }))
     })
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
+    .map_err(|e| ApiError::from_error(e).to_json())
 }
 
 /// # GET /boards/<board_id>/columns/<column_id>/cards
@@ -100,47 +111,55 @@ pub fn boards_create_card(
 ///     ...
 /// ]
 #[get("/<board_id>/columns/<column_id>/cards")]
-pub fn boards_get_cards(
-    db: &State<PSQLConnection>,
+pub async fn boards_get_cards(
+    db: Db,
     cookies: &CookieJar<'_>,
-    board_id: &str,
-    column_id: &str,
+    board_id: String,
+    column_id: String,
 ) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
-    let board_id = Uuid::try_parse(board_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    conn.transaction(|conn| {
-        let _ = board_users_relation::table
-            .filter(
-                board_users_relation::board_id
-                    .eq(board_id)
-                    .and(board_users_relation::user_id.eq(token)),
-            )
-            .first::<BoardUsersRelation>(conn)?;
-        let column = board_column::table
-            .filter(board_column::id.eq(Uuid::parse_str(column_id).unwrap()))
-            .select(board_column::id)
-            .first::<Uuid>(conn)?;
-        let cards = column_card::table
-            .filter(column_card::column_id.eq(column))
-            .select(SELECT_CARD)
-            .get_results::<ReturnedCard>(conn)?
-            .into_iter()
-            .map(|card| PubCard {
-                id: card.0,
-                name: card.1,
-                cover_attachment: card.2,
-                position: card.3,
-                description: card.4,
-                column_id: card.5,
-            })
-            .collect::<Vec<PubCard>>();
-        Ok::<Vec<PubCard>, diesel::result::Error>(cards)
+    let token = validate_user_token!(cookies);
+
+    db.run(move |conn| {
+        conn.transaction(|conn| {
+            let board_id = Uuid::try_parse(&board_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+            let column_id = Uuid::try_parse(&column_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+
+            let _ = board_users_relation::table
+                .filter(
+                    board_users_relation::board_id
+                        .eq(board_id)
+                        .and(board_users_relation::user_id.eq(token)),
+                )
+                .first::<BoardUsersRelation>(conn)?;
+
+            let column = board_column::table
+                .filter(board_column::id.eq(column_id))
+                .select(board_column::id)
+                .first::<Uuid>(conn)?;
+
+            let cards = column_card::table
+                .filter(column_card::column_id.eq(column))
+                .select(SELECT_CARD)
+                .get_results::<ReturnedCard>(conn)?
+                .into_iter()
+                .map(|card| PubCard {
+                    id: card.0,
+                    name: card.1,
+                    cover_attachment: card.2,
+                    position: card.3,
+                    description: card.4,
+                    column_id: card.5,
+                })
+                .collect::<Vec<PubCard>>();
+
+            Ok::<Vec<PubCard>, diesel::result::Error>(cards)
+        })
     })
-    .map(|cards| (Json(json!(cards))))
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
+    .await
+    .map(|cards| Json(json!(cards)))
+    .map_err(|e| ApiError::from_error(e).to_json())
 }
 
 /// # GET /boards/<board_id>/columns/<column_id>/cards/<card_id>
@@ -161,106 +180,64 @@ pub fn boards_get_cards(
 /// }
 /// ```
 #[get("/<board_id>/columns/<column_id>/cards/<card_id>")]
-pub fn boards_get_card(
-    db: &State<PSQLConnection>,
+pub async fn boards_get_card(
+    db: Db,
     cookies: &CookieJar<'_>,
-    board_id: &str,
-    column_id: &str,
-    card_id: &str,
+    board_id: String,
+    column_id: String,
+    card_id: String,
 ) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
-    let board_id = Uuid::try_parse(board_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    conn.transaction(|conn| {
-        let _ = board_users_relation::table
-            .filter(
-                board_users_relation::board_id
-                    .eq(board_id)
-                    .and(board_users_relation::user_id.eq(token)),
-            )
-            .first::<BoardUsersRelation>(conn)?;
-        let _ = board_column::table
-            .filter(board_column::id.eq(Uuid::parse_str(column_id).unwrap()))
-            .select(board_column::id)
-            .first::<Uuid>(conn)?;
-        let card = column_card::table
-            .filter(column_card::id.eq(Uuid::parse_str(card_id).unwrap()))
-            .select(SELECT_CARD)
-            .first::<ReturnedCard>(conn)?;
-        Ok::<ReturnedCard, diesel::result::Error>(card)
-    })
-    .map(|card| {
-        Json(json!(PubCard {
-            id: card.0,
-            name: card.1,
-            cover_attachment: card.2,
-            position: card.3,
-            description: card.4,
-            column_id: card.5
-        }))
-    })
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
-}
+    let token = validate_user_token!(cookies);
 
-/// # GET /boards/<board_id>/cards/<card_id>
-/// Returns the card with the given id
-/// # Arguments
-/// * `board_id` - The id of the board
-/// * `card_id` - The id of the card
-/// * `cookies` - Takes the token of the user
-/// # Returns
-/// * `card` - The card
-/// ```json
-/// {
-///     "id": <card_id>,
-///     "column_id": <column_id>,
-///     "description": <card_description>,
-///     "position": <card_position>
-/// }
-/// ```
-#[get("/<board_id>/cards/<card_id>")]
-pub fn boards_get_card_by_id(
-    db: &State<PSQLConnection>,
-    cookies: &CookieJar<'_>,
-    board_id: &str,
-    card_id: &str,
-) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
-    let board_id = Uuid::try_parse(board_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    let card_id = Uuid::try_parse(card_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    conn.transaction(|conn| {
-        let _ = board_users_relation::table
-            .filter(
-                board_users_relation::board_id
-                    .eq(board_id)
-                    .and(board_users_relation::user_id.eq(token)),
-            )
-            .first::<BoardUsersRelation>(conn)?;
-        let card = column_card::table
-            .filter(column_card::id.eq(card_id))
-            .select(SELECT_CARD)
-            .first::<ReturnedCard>(conn)?;
-        let card = PubCard {
-            id: card.0,
-            name: card.1,
-            cover_attachment: card.2,
-            position: card.3,
-            description: card.4,
-            column_id: card.5
-        };
+    db.run(move |conn| {
+        conn.transaction(|conn| {
+            let board_id = Uuid::try_parse(&board_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+            let column_id = Uuid::try_parse(&column_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+            let card_id = Uuid::try_parse(&card_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
 
-        Ok::<PubCard, diesel::result::Error>(card)
+            let _ = board_users_relation::table
+                .filter(
+                    board_users_relation::board_id
+                        .eq(board_id)
+                        .and(board_users_relation::user_id.eq(token)),
+                )
+                .first::<BoardUsersRelation>(conn)?;
+
+            let column = board_column::table
+                .filter(board_column::id.eq(column_id))
+                .select(board_column::id)
+                .first::<Uuid>(conn)?;
+
+            let card = column_card::table
+                .filter(column_card::id.eq(card_id))
+                .filter(column_card::column_id.eq(column))
+                .select(SELECT_CARD)
+                .first::<ReturnedCard>(conn)?;
+            let attachments = card_attachments::table
+                .filter(card_attachments::card_id.eq(card_id))
+                .inner_join(files::table)
+                .select((files::id, files::name))
+                .load::<(Uuid, String)>(conn)?
+                .into_iter()
+                .map(|(id, name)| PubAttachment { id, url: name })
+                .collect::<Vec<PubAttachment>>();
+
+            Ok::<Json<Value>, diesel::result::Error>(Json(json!({
+                "id": card.0,
+                "name": card.1,
+                "cover_attachment": card.2,
+                "position": card.3,
+                "description": card.4,
+                "column_id": card.5,
+                "attachments": attachments
+            })))
+        })
     })
-    .map(|card| {
-        Json(json!(card))
-    })
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
+    .await
+    .map_err(|e| ApiError::from_error(e).to_json())
 }
 
 /// # PUT /boards/<board_id>/columns/<column_id>/cards/<card_id>
@@ -282,42 +259,52 @@ pub fn boards_get_card_by_id(
 /// }
 /// ```
 #[put("/<board_id>/columns/<column_id>/cards/<card_id>", data = "<card>")]
-pub fn boards_update_card(
-    db: &State<PSQLConnection>,
+pub async fn boards_update_card(
+    db: Db,
     cookies: &CookieJar<'_>,
-    board_id: &str,
-    column_id: &str,
-    card_id: &str,
+    board_id: String,
+    column_id: String,
+    card_id: String,
     card: Json<CardInfo>,
 ) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
-    let board_id = Uuid::try_parse(board_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    conn.transaction(|conn| {
-        let _ = board_users_relation::table
-            .filter(
-                board_users_relation::board_id
-                    .eq(board_id)
-                    .and(board_users_relation::user_id.eq(token)),
-            )
-            .first::<BoardUsersRelation>(conn)?;
-        let _ = board_column::table
-            .filter(board_column::id.eq(Uuid::parse_str(column_id).unwrap()))
-            .select(board_column::id)
-            .first::<Uuid>(conn)?;
-        let card = diesel::update(column_card::table)
-            .filter(column_card::id.eq(Uuid::parse_str(card_id).unwrap()))
-            .set((
-                column_card::name.eq(card.name.clone()),
-                column_card::cover_attachment.eq(card.cover_attachment.clone()),
-                column_card::description.eq(card.description.clone()),
-            ))
-            .returning(SELECT_CARD)
-            .get_result::<ReturnedCard>(conn)?;
-        Ok::<ReturnedCard, diesel::result::Error>(card)
+    let token = validate_user_token!(cookies);
+
+    db.run(move |conn| {
+        conn.transaction(|conn| {
+            let board_id = Uuid::try_parse(&board_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+            let column_id = Uuid::try_parse(&column_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+            let card_id = Uuid::try_parse(&card_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+
+            let _ = board_users_relation::table
+                .filter(
+                    board_users_relation::board_id
+                        .eq(board_id)
+                        .and(board_users_relation::user_id.eq(token)),
+                )
+                .first::<BoardUsersRelation>(conn)?;
+
+            let column = board_column::table
+                .filter(board_column::id.eq(column_id))
+                .select(board_column::id)
+                .first::<Uuid>(conn)?;
+
+            let card = diesel::update(column_card::table)
+                .filter(column_card::id.eq(card_id))
+                .filter(column_card::column_id.eq(column))
+                .set((
+                    column_card::name.eq(card.name.clone()),
+                    column_card::description.eq(card.description.clone()),
+                ))
+                .returning(SELECT_CARD)
+                .get_result::<ReturnedCard>(conn)?;
+
+            Ok::<ReturnedCard, diesel::result::Error>(card)
+        })
     })
+    .await
     .map(|card| {
         Json(json!(PubCard {
             id: card.0,
@@ -328,93 +315,7 @@ pub fn boards_update_card(
             column_id: card.5
         }))
     })
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
-}
-
-/// # PUT /boards/<board_id>/columns/<column_id>/cards/<card1_id>/<card2_id>
-/// Swaps the position of two cards
-/// # Arguments
-/// * `board_id` - The id of the board
-/// * `column_id` - The id of the column
-/// * `card_id` - The id of the card
-/// * `cookies` - Takes the token of the user
-/// * `card` - The card information
-/// # Returns
-/// * `card` - The card
-/// ```json
-/// {
-///     "id": <card_id>,
-///     "column_id": <column_id>,
-///     "description": <card_description>,
-///     "position": <card_position>
-/// }
-/// ```
-#[put("/<board_id>/columns/<column_id>/cards/<card1_id>/<card2_id>")]
-pub fn boards_swap_card(
-    db: &State<PSQLConnection>,
-    cookies: &CookieJar<'_>,
-    board_id: &str,
-    column_id: &str,
-    card1_id: &str,
-    card2_id: &str,
-) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
-    let board_id = Uuid::try_parse(board_id).map_err(|_| {
-        return ApiError::from_message("Failed to parse board id".to_string()).to_json();
-    })?;
-    let column_id = Uuid::try_parse(column_id).map_err(|_| {
-        return ApiError::from_message("Failed to parse column id".to_string()).to_json();
-    })?;
-    let card1 = Uuid::try_parse(card1_id).map_err(|_| {
-        return ApiError::from_message("Failed to parse card 1 id".to_string()).to_json();
-    })?;
-    let card2 = Uuid::try_parse(card2_id).map_err(|_| {
-        return ApiError::from_message("Failed to parse card 2 id".to_string()).to_json();
-    })?;
-    conn.transaction(|conn| {
-        let _ = board_users_relation::table
-            .filter(
-                board_users_relation::board_id
-                    .eq(board_id)
-                    .and(board_users_relation::user_id.eq(token)),
-            )
-            .first::<BoardUsersRelation>(conn)?;
-        let column = board_column::table
-            .filter(board_column::id.eq(column_id))
-            .select(board_column::id)
-            .first::<Uuid>(conn)?;
-        let card1 = column_card::table
-            .filter(
-                column_card::id
-                    .eq(card1)
-                    .and(column_card::column_id.eq(column)),
-            )
-            .select((column_card::id, column_card::position))
-            .first::<(Uuid, i32)>(conn)?;
-        let card2 = column_card::table
-            .filter(
-                column_card::id
-                    .eq(card2)
-                    .and(column_card::column_id.eq(column)),
-            )
-            .select((column_card::id, column_card::position))
-            .first::<(Uuid, i32)>(conn)?;
-
-        diesel::update(column_card::table)
-            .filter(column_card::id.eq(card1.0))
-            .set(column_card::position.eq(card2.1))
-            .execute(conn)?;
-        diesel::update(column_card::table)
-            .filter(column_card::id.eq(card2.0))
-            .set(column_card::position.eq(card1.1))
-            .execute(conn)?;
-
-        Ok::<(Uuid, Uuid), diesel::result::Error>((card1.0, card2.0))
-    })
-    .map(|cards| Json(json!(cards)))
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
+    .map_err(|e| ApiError::from_error(e).to_json())
 }
 
 /// # PUT /boards/<board_id>/columns/<from_column_id>/cards/<card_id>/reorder
@@ -438,119 +339,81 @@ pub fn boards_swap_card(
 /// ]
 /// ```
 #[put("/<board_id>/columns/<from_column_id>/cards/<card_id>/reorder/<to_column_id>/<to_pos>")]
-pub fn boards_reorder_cards(
-    db: &State<PSQLConnection>,
+pub async fn boards_reorder_cards(
+    db: Db,
     cookies: &CookieJar<'_>,
-    board_id: &str,
-    from_column_id: &str,
-    card_id: &str,
-    to_column_id: &str,
-    to_pos: &str,
+    board_id: String,
+    from_column_id: String,
+    card_id: String,
+    to_column_id: String,
+    to_pos: i32,
 ) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
-    let board_id = Uuid::try_parse(board_id).map_err(|_| {
-        return ApiError::from_message("Failed to parse board id".to_string()).to_json();
-    })?;
-    let from_column_id = Uuid::try_parse(from_column_id).map_err(|_| {
-        return ApiError::from_message("Failed to parse from column id".to_string()).to_json();
-    })?;
-    let card_id = Uuid::try_parse(card_id).map_err(|_| {
-        return ApiError::from_message("Failed to parse card id".to_string()).to_json();
-    })?;
-    let to_column_id = Uuid::try_parse(to_column_id).map_err(|_| {
-        return ApiError::from_message("Failed to parse to column id".to_string()).to_json();
-    })?;
-    let to_pos = to_pos.parse::<i32>().map_err(|_| {
-        return ApiError::from_message("Failed to parse to position".to_string()).to_json();
-    })?;
-    conn.transaction(|conn| {
-        let _ = board_users_relation::table
-            .filter(
-                board_users_relation::board_id
-                    .eq(board_id)
-                    .and(board_users_relation::user_id.eq(token)),
-            )
-            .first::<BoardUsersRelation>(conn)
-            .map_err(|_| {
-                ApiError::from_message("You are not a member of this board".to_string()).to_json()
-            });
+    let token = validate_user_token!(cookies);
 
-        let card = column_card::table
-            .filter(
-                column_card::id
-                    .eq(card_id)
-                    .and(column_card::column_id.eq(from_column_id)),
-            )
-            .select((column_card::id, column_card::position))
-            .first::<(Uuid, i32)>(conn)?;
-        let from_column = board_column::table
-            .filter(board_column::id.eq(from_column_id))
-            .select(board_column::id)
-            .first::<Uuid>(conn)?;
-        let to_column = board_column::table
-            .filter(board_column::id.eq(to_column_id))
-            .select(board_column::id)
-            .first::<Uuid>(conn)?;
+    db.run(move |conn| {
+        conn.transaction(|conn| {
+            let board_id = Uuid::try_parse(&board_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+            let from_column_id = Uuid::try_parse(&from_column_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+            let card_id = Uuid::try_parse(&card_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+            let to_column_id = Uuid::try_parse(&to_column_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
 
-        if from_column == to_column {
-            if card.1 < to_pos {
-                diesel::update(
-                    column_card::table.filter(
-                        column_card::column_id
-                            .eq(from_column)
-                            .ne(column_card::id.eq(card_id))
-                            .and(column_card::position.between(card.1, to_pos)),
-                    ),
+            let _ = board_users_relation::table
+                .filter(
+                    board_users_relation::board_id
+                        .eq(board_id)
+                        .and(board_users_relation::user_id.eq(token)),
                 )
+                .first::<BoardUsersRelation>(conn)?;
+
+            let (card_id, pos) = column_card::table
+                .filter(column_card::id.eq(card_id))
+                .filter(column_card::column_id.eq(from_column_id))
+                .select((column_card::id, column_card::position))
+                .first::<(Uuid, i32)>(conn)?;
+
+            // Update positions in the source column
+            diesel::update(column_card::table)
+                .filter(column_card::column_id.eq(from_column_id))
+                .filter(column_card::position.gt(pos))
                 .set(column_card::position.eq(column_card::position - 1))
                 .execute(conn)?;
-            } else if card.1 > to_pos {
-                diesel::update(
-                    column_card::table.filter(
-                        column_card::column_id
-                            .eq(from_column)
-                            .ne(column_card::id.eq(card_id))
-                            .and(column_card::position.between(to_pos, card.1)),
-                    ),
-                )
+
+            // Update positions in the target column
+            diesel::update(column_card::table)
+                .filter(column_card::column_id.eq(to_column_id))
+                .filter(column_card::position.ge(to_pos))
                 .set(column_card::position.eq(column_card::position + 1))
                 .execute(conn)?;
-            }
-        } else {
-            diesel::update(
-                column_card::table.filter(
-                    column_card::column_id
-                        .eq(from_column)
-                        .ne(column_card::id.eq(card_id))
-                        .and(column_card::position.gt(card.1)),
-                ),
-            )
-            .set(column_card::position.eq(column_card::position - 1))
-            .execute(conn)?;
-            diesel::update(
-                column_card::table.filter(
-                    column_card::column_id
-                        .eq(to_column)
-                        .ne(column_card::id.eq(card_id))
-                        .and(column_card::position.ge(to_pos)),
-                ),
-            )
-            .set(column_card::position.eq(column_card::position + 1))
-            .execute(conn)?;
-        }
 
-        diesel::update(column_card::table.filter(column_card::id.eq(card.0)))
-            .set((
-                column_card::column_id.eq(to_column),
-                column_card::position.eq(to_pos),
-            ))
-            .execute(conn)?;
-        Ok::<Uuid, diesel::result::Error>(card.0)
+            // Move the card
+            let card = diesel::update(column_card::table)
+                .filter(column_card::id.eq(card_id))
+                .set((
+                    column_card::column_id.eq(to_column_id),
+                    column_card::position.eq(to_pos),
+                ))
+                .returning(SELECT_CARD)
+                .get_result::<ReturnedCard>(conn)?;
+
+            Ok::<ReturnedCard, diesel::result::Error>(card)
+        })
     })
-    .map(|cards| Json(json!(cards)))
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
+    .await
+    .map(|card| {
+        Json(json!(PubCard {
+            id: card.0,
+            name: card.1,
+            cover_attachment: card.2,
+            position: card.3,
+            description: card.4,
+            column_id: card.5
+        }))
+    })
+    .map_err(|e| ApiError::from_error(e).to_json())
 }
 
 /// # DELETE /boards/<board_id>/columns/<column_id>/cards/<card_id>
@@ -563,58 +426,80 @@ pub fn boards_reorder_cards(
 /// # Returns
 /// * `card_id` - card id
 #[delete("/<board_id>/columns/<column_id>/cards/<card_id>")]
-pub fn boards_delete_card(
-    db: &State<PSQLConnection>,
+pub async fn boards_delete_card(
+    db: Db,
     cookies: &CookieJar<'_>,
-    board_id: &str,
-    column_id: &str,
-    card_id: &str,
+    board_id: String,
+    column_id: String,
+    card_id: String,
 ) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
-    let board_id = Uuid::try_parse(board_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    let column_id = Uuid::try_parse(column_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    let card_id = Uuid::try_parse(card_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    conn.transaction(|conn| {
-        let _ = board_users_relation::table
-            .filter(
-                board_users_relation::board_id
-                    .eq(board_id)
-                    .and(board_users_relation::user_id.eq(token)),
-            )
-            .first::<BoardUsersRelation>(conn)?;
-        let column = board_column::table
-            .filter(board_column::id.eq(column_id))
-            .select(board_column::id)
-            .first::<Uuid>(conn)?;
-        let card = column_card::table
-            .filter(column_card::id.eq(card_id))
-            .select((column_card::id, column_card::position))
-            .first::<(Uuid, i32)>(conn)?;
-        diesel::update(
-            column_card::table.filter(
-                column_card::column_id
-                    .eq(column_id)
-                    .and(column_card::position.gt(card.1)),
-            ),
-        )
-        .set(column_card::position.eq(column_card::position - 1))
-        .execute(conn)?;
+    let token = validate_user_token!(cookies);
 
-        let card = diesel::delete(column_card::table)
-            .filter(
-                column_card::id
-                    .eq(card_id)
-                    .and(column_card::column_id.eq(column)),
-            )
-            .returning(column_card::id)
-            .get_result::<Uuid>(conn)?;
-        Ok::<Uuid, diesel::result::Error>(card)
+    db.run(move |conn| {
+        conn.transaction(|conn| {
+            let board_id = Uuid::try_parse(&board_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+            let column_id = Uuid::try_parse(&column_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+            let card_id = Uuid::try_parse(&card_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+
+            let _ = board_users_relation::table
+                .filter(
+                    board_users_relation::board_id
+                        .eq(board_id)
+                        .and(board_users_relation::user_id.eq(token)),
+                )
+                .first::<BoardUsersRelation>(conn)?;
+
+            let column = board_column::table
+                .filter(board_column::id.eq(column_id))
+                .select(board_column::id)
+                .first::<Uuid>(conn)?;
+
+            let (card_id, pos) = column_card::table
+                .filter(column_card::id.eq(card_id))
+                .select((column_card::id, column_card::position))
+                .first::<(Uuid, i32)>(conn)?;
+
+            diesel::update(column_card::table)
+                .filter(
+                    column_card::column_id
+                        .eq(column)
+                        .and(column_card::position.gt(pos)),
+                )
+                .set(column_card::position.eq(column_card::position - 1))
+                .execute(conn)?;
+
+            let attachments = card_attachments::table
+                .filter(card_attachments::card_id.eq(card_id))
+                .inner_join(files::table)
+                .select((card_attachments::file_id, files::name))
+                .load::<(Uuid, String)>(conn)?;
+
+            for (attachment, file_name) in attachments {
+                diesel::delete(card_attachments::table)
+                    .filter(card_attachments::card_id.eq(card_id))
+                    .filter(card_attachments::file_id.eq(attachment))
+                    .execute(conn)?;
+                diesel::delete(files::table)
+                    .filter(files::id.eq(attachment))
+                    .execute(conn)?;
+                std::fs::remove_file(format!("tmp/{}", file_name)).unwrap();
+            }
+            let card = diesel::delete(column_card::table)
+                .filter(
+                    column_card::id
+                        .eq(card_id)
+                        .and(column_card::column_id.eq(column)),
+                )
+                .returning(column_card::id)
+                .get_result::<Uuid>(conn)?;
+
+            Ok::<Uuid, diesel::result::Error>(card)
+        })
     })
-    .map(|card| (Json(json!(card))))
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
+    .await
+    .map(|card| Json(json!(card)))
+    .map_err(|e| ApiError::from_error(e).to_json())
 }

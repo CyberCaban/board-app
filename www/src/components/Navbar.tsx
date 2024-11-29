@@ -9,7 +9,7 @@ export default function Navbar() {
   const [store] = useUserStore((state) => state);
 
   useEffect(() => {
-    getData("/api/user", { cache: "force-cache" })
+    getData("/api/user")
       .then((res) => {
         store.setUser({
           id: res.id,

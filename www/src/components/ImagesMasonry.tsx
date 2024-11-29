@@ -51,8 +51,8 @@ export default function ImagesMasonry({
                     src={image}
                     alt="Uploaded Image"
                     loading="lazy"
-                    width={500}
-                    height={500}
+                    width={200}
+                    height={200}
                     className="rounded-xl shadow transition-all duration-200 hover:scale-105 group-hover:-translate-y-1"
                   />
                 </a>

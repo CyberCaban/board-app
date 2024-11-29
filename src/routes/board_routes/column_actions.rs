@@ -1,16 +1,17 @@
 use diesel::{BoolExpressionMethods, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
-use rocket::{http::CookieJar, serde::json::Json, State};
-use serde_json::{json, Value};
+use rocket::{
+    http::CookieJar,
+    serde::json::{json, Json},
+};
+use serde_json::Value;
 use uuid::Uuid;
 
 use crate::{
-    check_user_token, connect_db,
-    database::PSQLConnection,
+    database::Db,
     errors::{ApiError, ApiErrorType},
-    models::{
-        BoardColumn, BoardUsersRelation, NewColumn, PubColumn, ReturnedColumn,
-    },
-    schema::{board_column, board_users_relation, column_card},
+    models::{BoardColumn, BoardUsersRelation, NewColumn, PubColumn, ReturnedColumn},
+    schema::{board_column, board_users_relation, card_attachments, column_card, files},
+    validate_user_token,
 };
 
 /// # POST /boards/<board_id>/columns
@@ -21,38 +22,43 @@ use crate::{
 /// # Returns
 /// * `column_id` - The id of the column
 #[post("/<board_id>/columns", data = "<column>")]
-pub fn boards_create_column(
-    db: &State<PSQLConnection>,
+pub async fn boards_create_column(
+    db: Db,
     cookies: &CookieJar<'_>,
-    board_id: &str,
+    board_id: String,
     column: Json<NewColumn>,
 ) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
-    let board_id = Uuid::try_parse(board_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    conn.transaction(|conn| {
-        let _ = board_users_relation::table
-            .filter(
-                board_users_relation::board_id
-                    .eq(board_id)
-                    .and(board_users_relation::user_id.eq(token)),
-            )
-            .first::<BoardUsersRelation>(conn)?;
-        let column = diesel::insert_into(board_column::table)
-            .values(BoardColumn {
-                id: None,
-                name: column.name.map(|name| name.to_string()),
-                board_id,
-                position: column.position,
-            })
-            .returning(board_column::id)
-            .get_result::<Uuid>(conn)?;
-        Ok::<Uuid, diesel::result::Error>(column)
+    let token = validate_user_token!(cookies);
+
+    db.run(move |conn| {
+        conn.transaction(|conn| {
+            let board_id = Uuid::try_parse(&board_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+
+            let _ = board_users_relation::table
+                .filter(
+                    board_users_relation::board_id
+                        .eq(board_id)
+                        .and(board_users_relation::user_id.eq(token)),
+                )
+                .first::<BoardUsersRelation>(conn)?;
+
+            let column = diesel::insert_into(board_column::table)
+                .values(BoardColumn {
+                    id: None,
+                    name: column.name.clone(),
+                    board_id,
+                    position: column.position,
+                })
+                .returning(board_column::id)
+                .get_result::<Uuid>(conn)?;
+
+            Ok::<Uuid, diesel::result::Error>(column)
+        })
     })
-    .map(|id| (Json(json!(id))))
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
+    .await
+    .map(|id| Json(json!(id)))
+    .map_err(|e| ApiError::from_error(e).to_json())
 }
 
 /// # GET /boards/<board_id>/columns
@@ -73,39 +79,44 @@ pub fn boards_create_column(
 ///  ]
 /// ```
 #[get("/<board_id>/columns")]
-pub fn boards_get_columns(
-    db: &State<PSQLConnection>,
+pub async fn boards_get_columns(
+    db: Db,
     cookies: &CookieJar<'_>,
-    board_id: &str,
+    board_id: String,
 ) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
-    let board_id = Uuid::try_parse(board_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    conn.transaction(|conn| {
-        let _ = board_users_relation::table
-            .filter(
-                board_users_relation::board_id
-                    .eq(board_id)
-                    .and(board_users_relation::user_id.eq(token)),
-            )
-            .first::<BoardUsersRelation>(conn)?;
-        let columns = board_column::table
-            .filter(board_column::board_id.eq(board_id))
-            .select((board_column::id, board_column::name, board_column::position))
-            .load::<ReturnedColumn>(conn)?
-            .into_iter()
-            .map(|col| PubColumn {
-                id: col.0,
-                name: col.1,
-                position: col.2,
-            })
-            .collect::<Vec<PubColumn>>();
-        Ok::<Vec<PubColumn>, diesel::result::Error>(columns)
+    let token = validate_user_token!(cookies);
+
+    db.run(move |conn| {
+        conn.transaction(|conn| {
+            let board_id = Uuid::try_parse(&board_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+
+            let _ = board_users_relation::table
+                .filter(
+                    board_users_relation::board_id
+                        .eq(board_id)
+                        .and(board_users_relation::user_id.eq(token)),
+                )
+                .first::<BoardUsersRelation>(conn)?;
+
+            let columns = board_column::table
+                .filter(board_column::board_id.eq(board_id))
+                .select((board_column::id, board_column::name, board_column::position))
+                .load::<ReturnedColumn>(conn)?
+                .into_iter()
+                .map(|col| PubColumn {
+                    id: col.0,
+                    name: col.1,
+                    position: col.2,
+                })
+                .collect::<Vec<PubColumn>>();
+
+            Ok::<Vec<PubColumn>, diesel::result::Error>(columns)
+        })
     })
-    .map(|columns| (Json(json!(columns))))
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
+    .await
+    .map(|columns| Json(json!(columns)))
+    .map_err(|e| ApiError::from_error(e).to_json())
 }
 
 /// # GET /boards/<board_id>/columns/<column_id>
@@ -124,31 +135,39 @@ pub fn boards_get_columns(
 /// }
 /// ```
 #[get("/<board_id>/columns/<column_id>")]
-pub fn boards_get_column(
-    db: &State<PSQLConnection>,
+pub async fn boards_get_column(
+    db: Db,
     cookies: &CookieJar<'_>,
-    board_id: &str,
-    column_id: &str,
+    board_id: String,
+    column_id: String,
 ) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
-    let board_id = Uuid::try_parse(board_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    conn.transaction(|conn| {
-        let _ = board_users_relation::table
-            .filter(
-                board_users_relation::board_id
-                    .eq(board_id)
-                    .and(board_users_relation::user_id.eq(token)),
-            )
-            .first::<BoardUsersRelation>(conn)?;
-        let column = board_column::table
-            .filter(board_column::id.eq(Uuid::parse_str(column_id).unwrap()))
-            .select((board_column::id, board_column::name, board_column::position))
-            .first::<ReturnedColumn>(conn)?;
-        Ok::<ReturnedColumn, diesel::result::Error>(column)
+    let token = validate_user_token!(cookies);
+
+    db.run(move |conn| {
+        conn.transaction(|conn| {
+            let board_id = Uuid::try_parse(&board_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+
+            let _ = board_users_relation::table
+                .filter(
+                    board_users_relation::board_id
+                        .eq(board_id)
+                        .and(board_users_relation::user_id.eq(token)),
+                )
+                .first::<BoardUsersRelation>(conn)?;
+
+            let column = board_column::table
+                .filter(
+                    board_column::id.eq(Uuid::try_parse(&column_id)
+                        .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?),
+                )
+                .select((board_column::id, board_column::name, board_column::position))
+                .first::<ReturnedColumn>(conn)?;
+
+            Ok::<ReturnedColumn, diesel::result::Error>(column)
+        })
     })
+    .await
     .map(|column| {
         Json(json!(PubColumn {
             id: column.0,
@@ -156,7 +175,7 @@ pub fn boards_get_column(
             position: column.2
         }))
     })
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
+    .map_err(|e| ApiError::from_error(e).to_json())
 }
 
 /// # PUT /boards/<board_id>/columns/<column_id>
@@ -175,36 +194,44 @@ pub fn boards_get_column(
 /// }
 /// ```
 #[put("/<board_id>/columns/<column_id>", data = "<column>")]
-pub fn boards_update_column(
-    db: &State<PSQLConnection>,
+pub async fn boards_update_column(
+    db: Db,
     cookies: &CookieJar<'_>,
-    board_id: &str,
-    column_id: &str,
+    board_id: String,
+    column_id: String,
     column: Json<NewColumn>,
 ) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
-    let board_id = Uuid::try_parse(board_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    conn.transaction(|conn| {
-        let _ = board_users_relation::table
-            .filter(
-                board_users_relation::board_id
-                    .eq(board_id)
-                    .and(board_users_relation::user_id.eq(token)),
-            )
-            .first::<BoardUsersRelation>(conn)?;
-        let column = diesel::update(board_column::table)
-            .filter(board_column::id.eq(Uuid::parse_str(column_id).unwrap()))
-            .set((
-                board_column::name.eq(column.name.map(|name| name.to_string())),
-                board_column::position.eq(column.position),
-            ))
-            .returning((board_column::id, board_column::name, board_column::position))
-            .get_result::<ReturnedColumn>(conn)?;
-        Ok::<ReturnedColumn, diesel::result::Error>(column)
+    let token = validate_user_token!(cookies);
+
+    db.run(move |conn| {
+        conn.transaction(|conn| {
+            let board_id = Uuid::try_parse(&board_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+
+            let _ = board_users_relation::table
+                .filter(
+                    board_users_relation::board_id
+                        .eq(board_id)
+                        .and(board_users_relation::user_id.eq(token)),
+                )
+                .first::<BoardUsersRelation>(conn)?;
+
+            let column = diesel::update(board_column::table)
+                .filter(
+                    board_column::id.eq(Uuid::try_parse(&column_id)
+                        .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?),
+                )
+                .set((
+                    board_column::name.eq(column.name.clone()),
+                    board_column::position.eq(column.position),
+                ))
+                .returning((board_column::id, board_column::name, board_column::position))
+                .get_result::<ReturnedColumn>(conn)?;
+
+            Ok::<ReturnedColumn, diesel::result::Error>(column)
+        })
     })
+    .await
     .map(|column| {
         Json(json!(PubColumn {
             id: column.0,
@@ -212,7 +239,7 @@ pub fn boards_update_column(
             position: column.2
         }))
     })
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
+    .map_err(|e| ApiError::from_error(e).to_json())
 }
 
 /// # DELETE /boards/<board_id>/columns/<column_id>
@@ -231,34 +258,72 @@ pub fn boards_update_column(
 /// }
 /// ```
 #[delete("/<board_id>/columns/<column_id>")]
-pub fn boards_delete_column(
-    db: &State<PSQLConnection>,
+pub async fn boards_delete_column(
+    db: Db,
     cookies: &CookieJar<'_>,
-    board_id: &str,
-    column_id: &str,
+    board_id: String,
+    column_id: String,
 ) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
-    let board_id = Uuid::try_parse(board_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    conn.transaction(|conn| {
-        let _ = board_users_relation::table
-            .filter(
-                board_users_relation::board_id
-                    .eq(board_id)
-                    .and(board_users_relation::user_id.eq(token)),
-            )
-            .first::<BoardUsersRelation>(conn)?;
-        let _ = diesel::delete(column_card::table)
-            .filter(column_card::column_id.eq(Uuid::parse_str(column_id).unwrap()))
-            .execute(conn)?;
-        let column = diesel::delete(board_column::table)
-            .filter(board_column::id.eq(Uuid::parse_str(column_id).unwrap()))
-            .returning((board_column::id, board_column::name, board_column::position))
-            .get_result::<ReturnedColumn>(conn)?;
-        Ok::<ReturnedColumn, diesel::result::Error>(column)
+    let token = validate_user_token!(cookies);
+
+    db.run(move |conn| {
+        conn.transaction(|conn| {
+            let board_id = Uuid::try_parse(&board_id)
+                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+
+            let _ = board_users_relation::table
+                .filter(
+                    board_users_relation::board_id
+                        .eq(board_id)
+                        .and(board_users_relation::user_id.eq(token)),
+                )
+                .first::<BoardUsersRelation>(conn)?;
+
+            let cards = column_card::table
+                .filter(
+                    column_card::column_id.eq(Uuid::try_parse(&column_id)
+                        .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?),
+                )
+                .select((column_card::id, column_card::name))
+                .load::<(Uuid, String)>(conn)?;
+
+            for (card_id, _) in cards {
+                let attachments = card_attachments::table
+                    .filter(card_attachments::card_id.eq(card_id))
+                    .inner_join(files::table)
+                    .select((card_attachments::file_id, files::name))
+                    .load::<(Uuid, String)>(conn)?;
+
+                for (attachment, file_name) in attachments {
+                    diesel::delete(card_attachments::table)
+                        .filter(card_attachments::card_id.eq(card_id))
+                        .filter(card_attachments::file_id.eq(attachment))
+                        .execute(conn)?;
+                    diesel::delete(files::table)
+                        .filter(files::id.eq(attachment))
+                        .execute(conn)?;
+                    std::fs::remove_file(format!("tmp/{}", file_name)).unwrap();
+                }
+            }
+            let _ = diesel::delete(column_card::table)
+                .filter(
+                    column_card::column_id.eq(Uuid::try_parse(&column_id)
+                        .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?),
+                )
+                .execute(conn)?;
+
+            let column = diesel::delete(board_column::table)
+                .filter(
+                    board_column::id.eq(Uuid::try_parse(&column_id)
+                        .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?),
+                )
+                .returning((board_column::id, board_column::name, board_column::position))
+                .get_result::<ReturnedColumn>(conn)?;
+
+            Ok::<ReturnedColumn, diesel::result::Error>(column)
+        })
     })
+    .await
     .map(|column| {
         Json(json!(PubColumn {
             id: column.0,
@@ -266,5 +331,5 @@ pub fn boards_delete_column(
             position: column.2
         }))
     })
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
+    .map_err(|e| ApiError::from_error(e).to_json())
 }

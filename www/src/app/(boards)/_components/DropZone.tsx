@@ -22,7 +22,7 @@ export default function DropZone({
   return (
     <div
       className={clsx([
-        "drop-zone flex w-full flex-row items-center justify-between px-4",
+        "drop-zone flex w-full flex-row items-center justify-between px-4 duration-75",
         `column-${column_id}`,
         {
           hidden: dragged === null && dropZone !== pos || column_id !== dropColumn,

@@ -16,6 +16,7 @@ export interface IBoardCard {
   name: string;
   column_id: string;
   position: number;
+  cover_attachment: string;
 }
 
 export interface ICard {
@@ -25,7 +26,12 @@ export interface ICard {
   description: string;
   column_id: string;
   position: number;
-  attachments: string[];
+  attachments: ICardAttachment[];
+}
+
+export interface ICardAttachment {
+  id: string;
+  url: string;
 }
 
 export interface IBoard {

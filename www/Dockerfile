@@ -1,19 +1,55 @@
-FROM node:20.18.0-alpine AS node
-FROM alpine:3.20.2
-
-COPY --from=node /usr/lib /usr/lib
-COPY --from=node /usr/local/lib /usr/local/lib
-COPY --from=node /usr/local/include /usr/local/include
-COPY --from=node /usr/local/bin /usr/local/bin
-RUN node -v
+# Build stage
+FROM node:20-slim AS builder
 
 WORKDIR /app
-COPY ./package.json ./package-lock.json ./
-RUN npm install --force
+
+# Copy package files
+COPY package*.json ./
+COPY .env ./
+
+# Install dependencies
+RUN npm i --force
+
 ARG NEXT_PUBLIC_API_BASE_URL
-ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 
-COPY . ./
+# Copy source code
+COPY . .
 
-RUN npm run build 
-CMD npm run start
+# Build the application
+RUN npm run build
+
+# Production stage
+FROM node:20-slim AS runner
+
+WORKDIR /app
+
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y curl && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV NODE_ENV=production
+
+# Copy necessary files from builder
+COPY --from=builder /app/next.config.ts ./
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/.env ./
+
+# Install only production dependencies
+RUN npm i --force
+
+# Create a non-root user
+RUN useradd -m nextjs && chown -R nextjs:nextjs /app
+USER nextjs
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/api/toro || exit 1
+
+# Start the application
+CMD ["npm", "start"]

@@ -2,20 +2,23 @@ use diesel::{BoolExpressionMethods, Connection, ExpressionMethods, QueryDsl, Run
 use rocket::{
     http::CookieJar,
     serde::json::{json, Json},
-    State,
 };
 use serde_json::Value;
 use uuid::Uuid;
 
 use crate::{
-    check_user_token, connect_db,
-    database::PSQLConnection,
+    database::Db,
     errors::{ApiError, ApiErrorType},
     models::{
         Board, BoardInfo, BoardUsersRelation, NewBoard, PubBoard, PubCard, PubColumn, ReturnedCard,
         ReturnedColumn,
     },
-    schema::{board_column, board_users_relation, boards, column_card},
+    schema::{
+        board_column, board_users_relation, boards,
+        card_attachments,
+        column_card, files,
+    },
+    validate_user_token,
 };
 
 /// # POST /boards
@@ -26,33 +29,35 @@ use crate::{
 /// # Returns
 /// * `board_id` - The id of the board
 #[post("/", data = "<board>")]
-pub fn boards_create_board_and_relation(
-    db: &State<PSQLConnection>,
+pub async fn boards_create_board_and_relation(
+    db: Db,
     cookies: &CookieJar<'_>,
     board: Json<NewBoard>,
 ) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
-    conn.transaction(|conn| {
-        let board_id = diesel::insert_into(boards::table)
-            .values(Board {
-                id: None,
-                name: board.name.to_string(),
-                creator_id: token,
-            })
-            .returning(boards::id)
-            .get_result::<Uuid>(conn)?;
-        let _ = diesel::insert_into(board_users_relation::table)
-            .values(BoardUsersRelation {
-                user_id: token,
-                board_id,
-            })
-            .execute(conn)?;
-        Ok::<uuid::Uuid, diesel::result::Error>(board_id)
+    let token = validate_user_token!(cookies);
+
+    db.run(move |conn| {
+        conn.transaction(|conn| {
+            let board_id = diesel::insert_into(boards::table)
+                .values(Board {
+                    id: None,
+                    name: board.name.to_string(),
+                    creator_id: token,
+                })
+                .returning(boards::id)
+                .get_result::<Uuid>(conn)?;
+            let _ = diesel::insert_into(board_users_relation::table)
+                .values(BoardUsersRelation {
+                    user_id: token,
+                    board_id,
+                })
+                .execute(conn)?;
+            Ok::<uuid::Uuid, diesel::result::Error>(board_id)
+        })
     })
-    .map(|id| (Json(json!(id))))
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
+    .await
+    .map(|id| Json(json!(id)))
+    .map_err(|e| ApiError::from_error(e).to_json())
 }
 
 /// # GET /boards
@@ -71,18 +76,17 @@ pub fn boards_create_board_and_relation(
 /// ]
 /// ```
 #[get("/")]
-pub fn boards_get_boards(
-    db: &State<PSQLConnection>,
+pub async fn boards_get_boards(
+    db: Db,
     cookies: &CookieJar<'_>,
 ) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
-    conn.transaction(|conn| {
+    let token = validate_user_token!(cookies, db);
+
+    db.run(move |conn| {
         let ids = board_users_relation::table
             .filter(board_users_relation::user_id.eq(token))
             .select(board_users_relation::board_id)
-            .load::<Uuid>(&mut *conn)?;
+            .load::<Uuid>(conn)?;
         let bds = ids
             .iter()
             .map(|id| {
@@ -96,8 +100,9 @@ pub fn boards_get_boards(
             .collect::<Vec<_>>();
         Ok::<Vec<PubBoard>, diesel::result::Error>(bds)
     })
-    .map(|ids| (Json(json!(ids))))
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
+    .await
+    .map(|ids| Json(json!(ids)))
+    .map_err(|e| ApiError::from_error(e).to_json())
 }
 
 /// # GET /boards/<board_id>
@@ -131,17 +136,16 @@ pub fn boards_get_boards(
 /// }
 /// ```
 #[get("/<board_id>")]
-pub fn boards_get_board(
-    db: &State<PSQLConnection>,
+pub async fn boards_get_board(
+    db: Db,
     cookies: &CookieJar<'_>,
     board_id: &str,
 ) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
+    let token = validate_user_token!(cookies);
     let board_id = Uuid::try_parse(board_id)
         .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    conn.transaction(|conn| {
+
+    db.run(move |conn| {
         let _ = board_users_relation::table
             .filter(
                 board_users_relation::board_id
@@ -193,8 +197,9 @@ pub fn boards_get_board(
         };
         Ok::<BoardInfo, diesel::result::Error>(board)
     })
-    .map(|board| (Json(json!(board))))
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
+    .await
+    .map(|board| Json(json!(board)))
+    .map_err(|e| ApiError::from_error(e).to_json())
 }
 
 /// # PUT /boards/<board_id>
@@ -205,28 +210,28 @@ pub fn boards_get_board(
 /// # Returns
 /// * `board_id` - The id of the board
 #[put("/<board_id>", data = "<board>")]
-pub fn boards_update_board(
-    db: &State<PSQLConnection>,
+pub async fn boards_update_board(
+    db: Db,
     cookies: &CookieJar<'_>,
     board_id: &str,
-    board: &str,
+    board: String,
 ) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
+    let token = validate_user_token!(cookies);
     let board_id = Uuid::try_parse(board_id)
         .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    conn.transaction(|conn| {
-        let board = diesel::update(
+
+    db.run(move |conn| {
+        let res = diesel::update(
             boards::table.filter(boards::id.eq(board_id).and(boards::creator_id.eq(token))),
         )
         .set(boards::name.eq(board))
         .returning(boards::id)
         .get_result::<Uuid>(conn)?;
-        Ok::<Uuid, diesel::result::Error>(board)
+        Ok::<Uuid, diesel::result::Error>(res)
     })
-    .map(|id| (Json(json!(id))))
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
+    .await
+    .map(|id| Json(json!(id)))
+    .map_err(|e| ApiError::from_error(e).to_json())
 }
 
 /// # DELETE /boards/<board_id>
@@ -237,23 +242,48 @@ pub fn boards_update_board(
 /// # Returns
 /// * `board_id` - The id of the board
 #[delete("/<board_id>")]
-pub fn boards_delete_board(
-    db: &State<PSQLConnection>,
+pub async fn boards_delete_board(
+    db: Db,
     cookies: &CookieJar<'_>,
     board_id: &str,
 ) -> Result<Json<Value>, Json<Value>> {
-    let mut conn = connect_db!(db);
-    let token = check_user_token!(cookies, conn);
-    let conn = &mut *conn;
+    let token = validate_user_token!(cookies);
     let board_id = Uuid::try_parse(board_id)
         .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
-    conn.transaction(|conn| {
+
+    db.run(move |conn| {
         let column_ids = board_column::table
             .filter(board_column::board_id.eq(board_id))
             .select(board_column::id)
             .load::<Uuid>(conn)?;
-        diesel::delete(column_card::table.filter(column_card::column_id.eq_any(column_ids)))
-            .execute(conn)?;
+        for column_id in column_ids {
+            let cards = column_card::table
+                .filter(column_card::column_id.eq(column_id))
+                .select(column_card::id)
+                .load::<Uuid>(conn)?;
+            for idx in cards {
+                let attachments = card_attachments::table
+                    .filter(card_attachments::card_id.eq(idx))
+                    .inner_join(files::table)
+                    .select((card_attachments::file_id, files::name))
+                    .load::<(Uuid, String)>(conn)?;
+
+                for (attachment, file_name) in attachments {
+                    diesel::delete(card_attachments::table)
+                        .filter(card_attachments::card_id.eq(idx))
+                        .filter(card_attachments::file_id.eq(attachment))
+                        .execute(conn)?;
+                    diesel::delete(files::table)
+                        .filter(files::id.eq(attachment))
+                        .execute(conn)?;
+                    std::fs::remove_file(format!("tmp/{}", file_name)).unwrap();
+                }
+            }
+            diesel::delete(column_card::table)
+                .filter(column_card::column_id.eq(column_id))
+                .execute(conn)?;
+        }
+
         diesel::delete(board_column::table.filter(board_column::board_id.eq(board_id)))
             .execute(conn)?;
         diesel::delete(
@@ -267,6 +297,7 @@ pub fn boards_delete_board(
         .get_result::<Uuid>(conn)?;
         Ok::<Uuid, diesel::result::Error>(id)
     })
-    .map(|id| (Json(json!(id))))
-    .map_err(|e| (ApiError::from_error(&e).to_json()))
+    .await
+    .map(|id| Json(json!(id)))
+    .map_err(|e| ApiError::from_error(e).to_json())
 }
