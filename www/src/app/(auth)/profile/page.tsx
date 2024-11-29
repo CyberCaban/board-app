@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { putData } from "@/utils/utils";
+import { getData, putData } from "@/utils/utils";
 
 const formSchema = z.object({
   username: z.string().min(3).max(20),
@@ -77,19 +77,26 @@ export default function Profile() {
       profile_url: profile_url,
       bio: "",
     })
-      .then((user) => {
-        
-        store.setUser({
-          id: store.id,
-          username: user.username,
-          profile_url: user.profile_url,
-        });
+      .then(() => {
+        getData("/api/user")
+          .then((res) => {
+            store.setUser({
+              id: res.id,
+              username: res.username,
+              profile_url: res.profile_url,
+            });
+            console.log(res);
+            form.reset({
+              username: res.username,
+              profile_url: res.profile_url,
+            });
+          })
+          .catch((err) => {
+            console.error(err);
+            store.resetUser();
+          });
 
         toast.success("Profile updated successfully");
-        form.reset({
-          username: user.username,
-          profile_url: user.profile_url,
-        });
       })
       .catch((err) => toast.error(err.message));
   };
@@ -103,7 +110,9 @@ export default function Profile() {
         width={100}
         height={100}
       />
-      <Button className="mt-4" onClick={() => store.logout()}>Logout</Button>
+      <Button className="mt-4" onClick={() => store.logout()}>
+        Logout
+      </Button>
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}

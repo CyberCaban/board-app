@@ -1,15 +1,7 @@
 use catchers::Catcher;
 use config::from_env;
 use database::Db;
-use rocket::{
-    figment::{
-        providers::{Env, Format, Toml},
-        Figment,
-    },
-    Config,
-};
 use routes::AuthorizationRoutes;
-use std::collections::HashMap;
 
 mod catchers;
 mod config;
@@ -18,7 +10,6 @@ mod errors;
 mod models;
 mod routes;
 mod schema;
-mod services;
 
 #[macro_use]
 extern crate rocket;
@@ -32,7 +23,7 @@ async fn main() -> Result<(), rocket::Error> {
         .mount_uploads()
         .mount_catchers()
         .mount_auth_routes()
-        // .mount_board_routes()
+        .mount_board_routes()
         .launch()
         .await?;
 

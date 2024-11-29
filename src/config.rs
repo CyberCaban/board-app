@@ -2,7 +2,7 @@ use dotenv::dotenv;
 use rocket::{
     data::{Limits, ToByteUnit},
     figment::{
-        providers::{Env, Format, Toml},
+        providers::Env,
         value::magic::RelativePathBuf,
         Figment,
     },

@@ -6,7 +6,7 @@ use rocket::{form::Form, fs::TempFile, http::CookieJar};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::check_user_token;
+use crate::validate_user_token;
 use crate::database::Db;
 use crate::errors::{ApiError, ApiErrorType};
 use crate::models::{UploadedFile, User};
@@ -28,7 +28,7 @@ pub async fn api_upload_file(
     if form.file.content_type().is_none() {
         return Err(ApiError::new("InvalidFileType", "Invalid file type").to_json());
     }
-    let uploader_id = check_user_token!(cookies);
+    let uploader_id = validate_user_token!(cookies);
 
     let filename = form.filename.clone();
     let file_ext = match form.file.content_type() {
@@ -89,7 +89,7 @@ pub async fn api_get_file(
     db: Db,
     cookies: &CookieJar<'_>,
 ) -> Result<NamedFile, Json<Value>> {
-    let uploader_id = check_user_token!(cookies);
+    let uploader_id = validate_user_token!(cookies);
     let file_name_clone = file_name.clone();
 
     let found_file = db
@@ -121,7 +121,7 @@ pub async fn api_delete_file(
     db: Db,
     cookies: &CookieJar<'_>,
 ) -> Result<Json<Value>, Json<Value>> {
-    let uploader_id = check_user_token!(cookies);
+    let uploader_id = validate_user_token!(cookies);
     let file_name_clone = file_name.clone();
     db.run(move |conn| {
         conn.transaction(|conn| {
@@ -163,7 +163,7 @@ pub async fn api_get_files(db: Db, cookies: &CookieJar<'_>) -> Result<Json<Value
             .map(|files| Json(json!(files)))
             .map_err(|e| (ApiError::from_error(e).to_json()));
     }
-    let uploader_id = check_user_token!(cookies);
+    let uploader_id = validate_user_token!(cookies);
     db.run(move |conn| {
         files::table
             .filter(files::private.eq(false).or(files::user_id.eq(uploader_id)))

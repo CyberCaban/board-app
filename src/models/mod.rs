@@ -36,8 +36,8 @@ pub struct PubBoard {
     pub name: String,
 }
 #[derive(Serialize, Deserialize)]
-pub struct NewBoard<'a> {
-    pub name: &'a str,
+pub struct NewBoard {
+    pub name: String,
 }
 #[derive(Serialize, Deserialize)]
 pub struct BoardInfo {
@@ -68,8 +68,8 @@ pub struct PubColumn {
     pub position: i32,
 }
 #[derive(Serialize, Deserialize)]
-pub struct NewColumn<'a> {
-    pub name: Option<&'a str>,
+pub struct NewColumn {
+    pub name: Option<String>,
     pub position: i32,
 }
 pub type ReturnedColumn = (uuid::Uuid, Option<String>, i32);
@@ -137,7 +137,7 @@ pub struct ColumnCard {
 }
 
 #[macro_export]
-macro_rules! check_user_token {
+macro_rules! validate_user_token {
     ($cookies: ident) => {
         match $cookies.get("token") {
             Some(cookie) => match Uuid::parse_str(cookie.value_trimmed()) {
@@ -147,21 +147,21 @@ macro_rules! check_user_token {
             None => return Err(ApiError::from_type(ApiErrorType::Unauthorized).to_json()),
         }
     };
-    ($cookies: ident, $conn: ident) => {
+    ($cookies: ident, $db: ident) => {
         match $cookies.get("token") {
+            None => return Err(ApiError::from_type(ApiErrorType::Unauthorized).to_json()),
             Some(cookie) => match Uuid::parse_str(cookie.value_trimmed()) {
                 Err(_) => return Err(ApiError::from_type(ApiErrorType::InvalidToken).to_json()),
-                Ok(upl_id) => {
-                    if let Err(_) = crate::schema::users::table
-                        .filter(crate::schema::users::id.eq(upl_id))
-                        .first::<crate::models::User>(&mut *$conn)
-                    {
-                        return Err(ApiError::from_type(ApiErrorType::UserNotFound).to_json());
-                    }
-                    upl_id
-                }
+                Ok(upl_id) => $db
+                    .run(move |conn| {
+                        crate::schema::users::table
+                            .filter(crate::schema::users::id.eq(upl_id))
+                            .first::<crate::models::User>(conn)
+                    })
+                    .await
+                    .map_err(|_| ApiError::from_type(ApiErrorType::InvalidToken).to_json())
+                    .map(|usr| usr.id)?,
             },
-            None => return Err(ApiError::from_type(ApiErrorType::Unauthorized).to_json()),
         }
     };
 }

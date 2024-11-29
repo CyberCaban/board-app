@@ -136,12 +136,7 @@ export const createKanbanStore = (board: TKanban = defaultKanbanStore) => {
           },
           deleteCard: (id: string, column_id: string) => {
             deleteData(`/boards/${get().id}/columns/${column_id}/cards/${id}`)
-              .then(() => {
-                set((prev) => ({
-                  ...prev,
-                  cards: prev.cards.filter((card) => card.id !== id),
-                }));
-              })
+              .then(() => get().requestBoard(get().id))
               .catch((e) => toast.error(e.message));
           },
           updateCard: (

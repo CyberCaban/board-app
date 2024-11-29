@@ -10,6 +10,9 @@ COPY .env ./
 # Install dependencies
 RUN npm i --force
 
+ARG NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+
 # Copy source code
 COPY . .
 
@@ -46,7 +49,7 @@ EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/api/toro || exit 1
+    CMD curl -f http://localhost:5000/api/toro || exit 1
 
 # Start the application
 CMD ["npm", "start"]

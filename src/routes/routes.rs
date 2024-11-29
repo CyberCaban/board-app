@@ -3,7 +3,7 @@ use diesel::{ExpressionMethods, RunQueryDsl};
 use rocket::http::{Cookie, CookieJar};
 use rocket::response::content::RawHtml;
 use rocket::time::{Duration, OffsetDateTime};
-use rocket::{serde::json::Json, State};
+use rocket::serde::json::Json;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -12,7 +12,7 @@ use crate::errors::ApiErrorType;
 use crate::errors::{ApiError, LoginError, RegisterError};
 use crate::models::User;
 use crate::schema::users::{self, dsl::*};
-use crate::{check_user_token, models};
+use crate::validate_user_token;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NewUser {
@@ -32,7 +32,7 @@ pub struct UpdateUser {
 #[get("/user")]
 pub async fn api_get_user(db: Db, jar: &CookieJar<'_>) -> Result<Json<User>, Json<Value>> {
     use uuid::Uuid;
-    let user_token = check_user_token!(jar);
+    let user_token = validate_user_token!(jar);
     db.run(move |conn| users::table.filter(users::id.eq(user_token)).first(conn))
         .await
         .map(|user| Json(user))
@@ -128,7 +128,7 @@ pub async fn api_update_user(
     new_user: Json<UpdateUser>,
     jar: &CookieJar<'_>,
 ) -> Result<Json<Value>, Json<Value>> {
-    let user_token = check_user_token!(jar);
+    let user_token = validate_user_token!(jar);
     let new_user = new_user.into_inner();
 
     db.run(move |conn| {
@@ -136,7 +136,6 @@ pub async fn api_update_user(
             .filter(users::id.eq(user_token))
             .set((
                 users::username.eq(&new_user.username.trim()),
-                users::password.eq(&new_user.new_password.trim()),
                 users::profile_url.eq(&new_user.profile_url.trim()),
                 users::bio.eq(&new_user.bio.trim()),
             ))
