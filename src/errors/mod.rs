@@ -12,6 +12,7 @@ pub enum ApiErrorType {
     YouDoNotOwnThisFile,
     FailedToParseUUID,
     NotFound,
+    FailedToDeleteFile
 }
 
 impl ToString for ApiErrorType {
@@ -25,11 +26,12 @@ impl ToString for ApiErrorType {
             ApiErrorType::YouDoNotOwnThisFile => "You do not own this file".to_string(),
             ApiErrorType::FailedToParseUUID => "Failed to parse UUID".to_string(),
             ApiErrorType::NotFound => "Not Found".to_string(),
+            ApiErrorType::FailedToDeleteFile => "Failed to delete file".to_string(),
         }
     }
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Debug)]
 pub struct ApiError {
     error_type: String,
     error_msg: String,

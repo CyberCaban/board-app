@@ -7,14 +7,18 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::{
-    validate_user_token,
     database::Db,
     errors::{ApiError, ApiErrorType},
     models::{
         Board, BoardInfo, BoardUsersRelation, NewBoard, PubBoard, PubCard, PubColumn, ReturnedCard,
         ReturnedColumn,
     },
-    schema::{board_column, board_users_relation, boards, column_card},
+    schema::{
+        board_column, board_users_relation, boards,
+        card_attachments,
+        column_card, files,
+    },
+    validate_user_token,
 };
 
 /// # POST /boards
@@ -252,8 +256,34 @@ pub async fn boards_delete_board(
             .filter(board_column::board_id.eq(board_id))
             .select(board_column::id)
             .load::<Uuid>(conn)?;
-        diesel::delete(column_card::table.filter(column_card::column_id.eq_any(column_ids)))
-            .execute(conn)?;
+        for column_id in column_ids {
+            let cards = column_card::table
+                .filter(column_card::column_id.eq(column_id))
+                .select(column_card::id)
+                .load::<Uuid>(conn)?;
+            for idx in cards {
+                let attachments = card_attachments::table
+                    .filter(card_attachments::card_id.eq(idx))
+                    .inner_join(files::table)
+                    .select((card_attachments::file_id, files::name))
+                    .load::<(Uuid, String)>(conn)?;
+
+                for (attachment, file_name) in attachments {
+                    diesel::delete(card_attachments::table)
+                        .filter(card_attachments::card_id.eq(idx))
+                        .filter(card_attachments::file_id.eq(attachment))
+                        .execute(conn)?;
+                    diesel::delete(files::table)
+                        .filter(files::id.eq(attachment))
+                        .execute(conn)?;
+                    std::fs::remove_file(format!("tmp/{}", file_name)).unwrap();
+                }
+            }
+            diesel::delete(column_card::table)
+                .filter(column_card::column_id.eq(column_id))
+                .execute(conn)?;
+        }
+
         diesel::delete(board_column::table.filter(board_column::board_id.eq(board_id)))
             .execute(conn)?;
         diesel::delete(

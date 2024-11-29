@@ -6,7 +6,9 @@ import {
 import { cn } from "@/lib/utils";
 import { useKanbanStore } from "@/providers/kanbanProvider";
 import { IBoardCard } from "@/types";
+import { isImage } from "@/utils/utils";
 import { DropdownMenuContent } from "@radix-ui/react-dropdown-menu";
+import Image from "next/image";
 import Link from "next/link";
 
 interface KanbanCardProps extends React.HTMLAttributes<HTMLAnchorElement> {
@@ -34,18 +36,33 @@ export default function KanbanCard({
       )}
       {...props}
     >
-      <p className="line-clamp-3 overflow-x-auto break-words">{card.name}</p>
-      <DropdownMenu>
-        <DropdownMenuTrigger className="ml-2 h-auto w-auto self-start bg-transparent px-2 py-1 font-bold">
-          ...
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          className="rounded-md border border-neutral-600 bg-black px-2 py-1 font-semibold text-white"
-          onClick={onDelete}
-        >
-          Delete
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <div className="flex flex-col">
+        {card.cover_attachment && isImage(card.cover_attachment) && (
+          <div className="mb-2 self-center bg-cover">
+            <Image
+              src={`/uploads/${card.cover_attachment}`}
+              alt=""
+              width={100}
+              height={50}
+              className="rounded-md"
+            />
+          </div>
+        )}
+        <p className="line-clamp-3 overflow-x-auto break-words">{card.name}</p>
+      </div>
+      <div className="relative right-2 top-0">
+        <DropdownMenu>
+          <DropdownMenuTrigger className="ml-2 h-auto w-auto self-start bg-transparent px-2 py-1 font-bold">
+            ...
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="rounded-md border border-neutral-600 bg-black px-2 py-1 font-semibold text-white"
+            onClick={onDelete}
+          >
+            Delete
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </Link>
   );
 }

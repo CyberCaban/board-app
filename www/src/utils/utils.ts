@@ -98,3 +98,14 @@ export function reorder<T>(list: T[], startIndex: number, endIndex: number) {
   else if (startIndex > endIndex) _reorderBackward(list, startIndex, endIndex);
   return list;
 }
+
+export function isImage(url: string) {
+  return (
+    url.endsWith(".png") ||
+    url.endsWith(".jpg") ||
+    url.endsWith(".jpeg") ||
+    url.endsWith(".svg") ||
+    url.endsWith(".avif") ||
+    url.endsWith(".webp")
+  );
+}

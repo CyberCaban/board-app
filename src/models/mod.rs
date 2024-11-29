@@ -1,4 +1,5 @@
 use diesel::{Insertable, Queryable, QueryableByName, Selectable};
+use rocket::fs::TempFile;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -107,7 +108,6 @@ pub struct NewCard {
 #[derive(Serialize, Deserialize)]
 pub struct CardInfo {
     pub name: String,
-    pub cover_attachment: Option<String>,
     pub description: String,
 }
 pub const SELECT_CARD: (
@@ -134,6 +134,18 @@ pub struct ColumnCard {
     pub column_id: uuid::Uuid,
     pub position: i32,
     pub description: Option<String>,
+}
+
+#[derive(FromForm)]
+pub struct UploadAttachment<'f> {
+    pub file: TempFile<'f>,
+    pub filename: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PubAttachment {
+    pub id: uuid::Uuid,
+    pub url: String,
 }
 
 #[macro_export]

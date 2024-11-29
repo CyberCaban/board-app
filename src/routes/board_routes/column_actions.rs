@@ -1,16 +1,17 @@
 use diesel::{BoolExpressionMethods, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
-use rocket::{http::CookieJar, serde::json::{json, Json}};
+use rocket::{
+    http::CookieJar,
+    serde::json::{json, Json},
+};
 use serde_json::Value;
 use uuid::Uuid;
 
 use crate::{
-    validate_user_token,
     database::Db,
     errors::{ApiError, ApiErrorType},
-    models::{
-        BoardColumn, BoardUsersRelation, NewColumn, PubColumn, ReturnedColumn,
-    },
-    schema::{board_column, board_users_relation, column_card},
+    models::{BoardColumn, BoardUsersRelation, NewColumn, PubColumn, ReturnedColumn},
+    schema::{board_column, board_users_relation, card_attachments, column_card, files},
+    validate_user_token,
 };
 
 /// # POST /boards/<board_id>/columns
@@ -156,8 +157,10 @@ pub async fn boards_get_column(
                 .first::<BoardUsersRelation>(conn)?;
 
             let column = board_column::table
-                .filter(board_column::id.eq(Uuid::try_parse(&column_id)
-                    .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?))
+                .filter(
+                    board_column::id.eq(Uuid::try_parse(&column_id)
+                        .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?),
+                )
                 .select((board_column::id, board_column::name, board_column::position))
                 .first::<ReturnedColumn>(conn)?;
 
@@ -214,8 +217,10 @@ pub async fn boards_update_column(
                 .first::<BoardUsersRelation>(conn)?;
 
             let column = diesel::update(board_column::table)
-                .filter(board_column::id.eq(Uuid::try_parse(&column_id)
-                    .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?))
+                .filter(
+                    board_column::id.eq(Uuid::try_parse(&column_id)
+                        .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?),
+                )
                 .set((
                     board_column::name.eq(column.name.clone()),
                     board_column::position.eq(column.position),
@@ -274,14 +279,44 @@ pub async fn boards_delete_column(
                 )
                 .first::<BoardUsersRelation>(conn)?;
 
+            let cards = column_card::table
+                .filter(
+                    column_card::column_id.eq(Uuid::try_parse(&column_id)
+                        .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?),
+                )
+                .select((column_card::id, column_card::name))
+                .load::<(Uuid, String)>(conn)?;
+
+            for (card_id, _) in cards {
+                let attachments = card_attachments::table
+                    .filter(card_attachments::card_id.eq(card_id))
+                    .inner_join(files::table)
+                    .select((card_attachments::file_id, files::name))
+                    .load::<(Uuid, String)>(conn)?;
+
+                for (attachment, file_name) in attachments {
+                    diesel::delete(card_attachments::table)
+                        .filter(card_attachments::card_id.eq(card_id))
+                        .filter(card_attachments::file_id.eq(attachment))
+                        .execute(conn)?;
+                    diesel::delete(files::table)
+                        .filter(files::id.eq(attachment))
+                        .execute(conn)?;
+                    std::fs::remove_file(format!("tmp/{}", file_name)).unwrap();
+                }
+            }
             let _ = diesel::delete(column_card::table)
-                .filter(column_card::column_id.eq(Uuid::try_parse(&column_id)
-                    .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?))
+                .filter(
+                    column_card::column_id.eq(Uuid::try_parse(&column_id)
+                        .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?),
+                )
                 .execute(conn)?;
 
             let column = diesel::delete(board_column::table)
-                .filter(board_column::id.eq(Uuid::try_parse(&column_id)
-                    .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?))
+                .filter(
+                    board_column::id.eq(Uuid::try_parse(&column_id)
+                        .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?),
+                )
                 .returning((board_column::id, board_column::name, board_column::position))
                 .get_result::<ReturnedColumn>(conn)?;
 

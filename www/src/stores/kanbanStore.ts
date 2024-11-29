@@ -9,6 +9,7 @@ export type TKanban = IBoard & { cardModal?: ICard };
 export type KanbanActions = {
   requestBoard: (id: string) => Promise<void>;
   getBoard: () => void;
+  deleteBoard: () => Promise<void>;
   update: (kanban: TKanban) => void;
   reset: () => void;
   addColumn: (name: string, position: number) => void;
@@ -21,10 +22,8 @@ export type KanbanActions = {
   updateCard: (
     id: string,
     name: string,
-    cover_attachment: string,
     description: string,
     column_id: string,
-    attachments: string[],
   ) => void;
   swapCards: (id1: string, id2: string, column_id: string) => void;
   reorderList: (
@@ -55,6 +54,10 @@ export const createKanbanStore = (board: TKanban = defaultKanbanStore) => {
           ...board,
           getBoard: () => board,
           requestBoard: (id: string) => getData(`/boards/${id}`).then(set),
+          deleteBoard: () =>
+            deleteData(`/boards/${get().id}`).then(() =>
+              set(defaultKanbanStore),
+            ),
           update: (kanban: TKanban) => set({ ...kanban }),
           reset: () => set(defaultKanbanStore),
           addColumn: (name: string, position: number) => {
@@ -142,15 +145,12 @@ export const createKanbanStore = (board: TKanban = defaultKanbanStore) => {
           updateCard: (
             id: string,
             name: string,
-            cover_attachment: string,
             description: string,
             column_id: string,
-            // attachments: string[],
           ) => {
             putData(`/boards/${get().id}/columns/${column_id}/cards/${id}`, {
               name,
               description,
-              cover_attachment,
             })
               .then(() => {
                 getData(`/boards/${get().id}/columns/${column_id}/cards/${id}`)

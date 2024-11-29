@@ -10,9 +10,10 @@ use crate::{
     database::Db,
     errors::{ApiError, ApiErrorType},
     models::{
-        BoardUsersRelation, CardInfo, ColumnCard, NewCard, PubCard, ReturnedCard, SELECT_CARD,
+        BoardUsersRelation, CardInfo, ColumnCard, NewCard, PubAttachment, PubCard, ReturnedCard,
+        SELECT_CARD,
     },
-    schema::{board_column, board_users_relation, column_card},
+    schema::{board_column, board_users_relation, card_attachments, column_card, files},
     validate_user_token,
 };
 
@@ -215,83 +216,27 @@ pub async fn boards_get_card(
                 .filter(column_card::column_id.eq(column))
                 .select(SELECT_CARD)
                 .first::<ReturnedCard>(conn)?;
+            let attachments = card_attachments::table
+                .filter(card_attachments::card_id.eq(card_id))
+                .inner_join(files::table)
+                .select((files::id, files::name))
+                .load::<(Uuid, String)>(conn)?
+                .into_iter()
+                .map(|(id, name)| PubAttachment { id, url: name })
+                .collect::<Vec<PubAttachment>>();
 
-            Ok::<ReturnedCard, diesel::result::Error>(card)
+            Ok::<Json<Value>, diesel::result::Error>(Json(json!({
+                "id": card.0,
+                "name": card.1,
+                "cover_attachment": card.2,
+                "position": card.3,
+                "description": card.4,
+                "column_id": card.5,
+                "attachments": attachments
+            })))
         })
     })
     .await
-    .map(|card| {
-        Json(json!(PubCard {
-            id: card.0,
-            name: card.1,
-            cover_attachment: card.2,
-            position: card.3,
-            description: card.4,
-            column_id: card.5
-        }))
-    })
-    .map_err(|e| ApiError::from_error(e).to_json())
-}
-
-/// # GET /boards/<board_id>/cards/<card_id>
-/// Returns the card with the given id
-/// # Arguments
-/// * `board_id` - The id of the board
-/// * `card_id` - The id of the card
-/// * `cookies` - Takes the token of the user
-/// # Returns
-/// * `card` - The card
-/// ```json
-/// {
-///     "id": <card_id>,
-///     "column_id": <column_id>,
-///     "description": <card_description>,
-///     "position": <card_position>
-/// }
-/// ```
-#[get("/<board_id>/cards/<card_id>")]
-pub async fn boards_get_card_by_id(
-    db: Db,
-    cookies: &CookieJar<'_>,
-    board_id: String,
-    card_id: String,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
-
-    db.run(move |conn| {
-        conn.transaction(|conn| {
-            let board_id = Uuid::try_parse(&board_id)
-                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
-            let card_id = Uuid::try_parse(&card_id)
-                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
-
-            let _ = board_users_relation::table
-                .filter(
-                    board_users_relation::board_id
-                        .eq(board_id)
-                        .and(board_users_relation::user_id.eq(token)),
-                )
-                .first::<BoardUsersRelation>(conn)?;
-
-            let card = column_card::table
-                .filter(column_card::id.eq(card_id))
-                .select(SELECT_CARD)
-                .first::<ReturnedCard>(conn)?;
-
-            Ok::<ReturnedCard, diesel::result::Error>(card)
-        })
-    })
-    .await
-    .map(|card| {
-        Json(json!(PubCard {
-            id: card.0,
-            name: card.1,
-            cover_attachment: card.2,
-            position: card.3,
-            description: card.4,
-            column_id: card.5
-        }))
-    })
     .map_err(|e| ApiError::from_error(e).to_json())
 }
 
@@ -525,6 +470,23 @@ pub async fn boards_delete_card(
                 )
                 .set(column_card::position.eq(column_card::position - 1))
                 .execute(conn)?;
+
+            let attachments = card_attachments::table
+                .filter(card_attachments::card_id.eq(card_id))
+                .inner_join(files::table)
+                .select((card_attachments::file_id, files::name))
+                .load::<(Uuid, String)>(conn)?;
+
+            for (attachment, file_name) in attachments {
+                diesel::delete(card_attachments::table)
+                    .filter(card_attachments::card_id.eq(card_id))
+                    .filter(card_attachments::file_id.eq(attachment))
+                    .execute(conn)?;
+                diesel::delete(files::table)
+                    .filter(files::id.eq(attachment))
+                    .execute(conn)?;
+                std::fs::remove_file(format!("tmp/{}", file_name)).unwrap();
+            }
             let card = diesel::delete(column_card::table)
                 .filter(
                     column_card::id
