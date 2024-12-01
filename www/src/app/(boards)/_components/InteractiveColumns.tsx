@@ -60,7 +60,7 @@ export default function InteractiveColumns() {
       {dragged !== null && (
         <div
           className={clsx(
-            "phantom-card pointer-events-none absolute w-[300px]",
+            "phantom-card pointer-events-none absolute w-full max-w-[250px]",
             { hidden: !phantomCard.current },
           )}
           ref={phantomCard}

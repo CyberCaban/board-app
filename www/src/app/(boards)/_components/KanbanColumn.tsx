@@ -49,13 +49,17 @@ export default function KanbanColumn({
 
   return (
     <li
-      className="flex min-w-[300px] max-w-[300px] flex-col gap-2 overflow-x-hidden overflow-y-scroll rounded-xl p-4"
+      className="flex max-h-full min-w-[300px] max-w-[300px] flex-col gap-2 overflow-x-hidden overflow-y-scroll rounded-xl p-4"
       {...props}
     >
       <div className="flex items-center justify-between">
         <h2 className="text-xl">{title}</h2>
         <DropdownMenu>
-          <DropdownMenuTrigger className="ml-2 h-auto w-auto self-start bg-transparent px-2 py-1 font-bold">
+          <DropdownMenuTrigger
+            key={id}
+            asChild
+            className="ml-2 h-auto w-auto self-start bg-transparent px-2 py-1 font-bold"
+          >
             ...
           </DropdownMenuTrigger>
           <DropdownMenuContent

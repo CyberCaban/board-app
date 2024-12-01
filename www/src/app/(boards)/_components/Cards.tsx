@@ -10,6 +10,7 @@ interface ICard {
   dropZone: number | null;
   dropColumn: string | null;
 }
+
 export default function Cards({
   cards,
   column_id,
@@ -21,8 +22,13 @@ export default function Cards({
   const columnCards = cards
     .filter((card) => card.column_id === column_id)
     .toSorted((a, b) => a.position - b.position);
+
+  const draggedCard = dragged
+    ? cards.find((card) => card.id === dragged)
+    : undefined;
+
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex max-w-full flex-col gap-2 overflow-y-scroll">
       {columnCards.map((card) => (
         <div className="flex flex-col" key={card.position}>
           <DropZone
@@ -31,6 +37,7 @@ export default function Cards({
             dropZone={dropZone}
             column_id={column_id}
             dropColumn={dropColumn}
+            card={dragged ? draggedCard : undefined}
           />
           <>
             {dragged !== card.id && (
@@ -55,6 +62,7 @@ export default function Cards({
         dropZone={dropZone}
         column_id={column_id}
         dropColumn={dropColumn}
+        card={dragged ? draggedCard : undefined}
       />
     </div>
   );

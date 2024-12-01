@@ -14,7 +14,7 @@ export default function ImagesMasonry({
   return (
     <div>
       <h1>Images</h1>
-      <div className="columns-4 gap-4 space-y-4 md:columns-6">
+      <div className="columns-2 gap-4 space-y-4 sm:columns-3 md:columns-3 lg:columns-5 xl:columns-6">
         {imagesURL &&
           imagesURL.map((image) => {
             if (
@@ -53,7 +53,7 @@ export default function ImagesMasonry({
                     loading="lazy"
                     width={200}
                     height={200}
-                    className="rounded-xl shadow transition-all duration-200 hover:scale-105 group-hover:-translate-y-1"
+                    className="min-w-full rounded-xl shadow transition-all duration-200 hover:scale-105 group-hover:-translate-y-1"
                   />
                 </a>
                 <button
