@@ -55,14 +55,41 @@ export default function InteractiveColumns() {
     return () => document.removeEventListener("mousemove", mouseHandler);
   }, [dCard, dragged, dropColumn]);
 
+  function onReorderEnd(e: React.MouseEvent) {
+    e.preventDefault();
+    if (dropZone === null || dropColumn === null) return;
+    const newPosition =
+      dCard!.column_id === dropColumn
+        ? dropZone <= dCard!.position
+          ? dropZone
+          : dropZone - 1
+        : dropZone;
+    // if (document.startViewTransition) document.startViewTransition();
+    kstore.reorderList(dCard!.column_id, dropColumn!, newPosition, dCard!.id);
+    // console.log(
+    //   "reorder",
+    //   dCard!.position,
+    //   newPosition,
+    //   "diff columns:",
+    //   dCard!.column_id !== dropColumn,
+    // );
+    setDropZone(null);
+    setDropColumn(null);
+    setDragged(null);
+  }
+
   return (
     <>
       {dragged !== null && (
         <div
           className={clsx(
-            "phantom-card pointer-events-none absolute w-full max-w-[250px]",
-            { hidden: !phantomCard.current },
+            "phantom-card pointer-events-none fixed w-full max-w-[250px] z-50",
+            { invisible: !phantomCard.current },
           )}
+          style={{
+            viewTransitionName: `phantom-${dragged}`,
+            contain: 'paint layout style',
+          }}
           ref={phantomCard}
         >
           <KanbanCard card={dCard!} />
@@ -74,33 +101,7 @@ export default function InteractiveColumns() {
           id={col.id}
           title={col.name}
           onMouseOver={() => setDropColumn(col.id)}
-          onMouseUp={(e) => {
-            e.preventDefault();
-            if (dropZone === null || dropColumn === null) return;
-            const newPosition =
-              dCard!.column_id === dropColumn
-                ? dropZone <= dCard!.position
-                  ? dropZone
-                  : dropZone - 1
-                : dropZone;
-            if (document.startViewTransition) document.startViewTransition();
-            kstore.reorderList(
-              dCard!.column_id,
-              dropColumn!,
-              newPosition,
-              dCard!.id,
-            );
-            // console.log(
-            //   "reorder",
-            //   dCard!.position,
-            //   newPosition,
-            //   "diff columns:",
-            //   dCard!.column_id !== dropColumn,
-            // );
-            setDropZone(null);
-            setDropColumn(null);
-            setDragged(null);
-          }}
+          onMouseUp={onReorderEnd}
         >
           <Cards
             cards={kstore.cards}

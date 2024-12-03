@@ -90,7 +90,7 @@ function Board(props: { params: Params }) {
             </div>
             <p>{kstore.id}</p>
           </div>
-          <ol className="flex h-[calc(100vh-200px)] w-11/12 flex-row items-start gap-4 overflow-x-scroll p-2">
+          <ol className="flex h-[calc(100vh-200px)] w-11/12 flex-row items-start gap-4 overflow-x-auto p-2">
             <InteractiveColumns />
             {isDanglingColumn ? (
               <div className="min-w-60">
