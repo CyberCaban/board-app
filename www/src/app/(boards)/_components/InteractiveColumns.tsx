@@ -5,7 +5,6 @@ import KanbanColumn from "./KanbanColumn";
 import Cards from "./Cards";
 import KanbanCard from "./KanbanCard";
 import { useKanbanStore } from "@/providers/kanbanProvider";
-import clsx from "clsx";
 
 // interface InteractiveColumnsProps {}
 export default function InteractiveColumns() {
@@ -15,6 +14,7 @@ export default function InteractiveColumns() {
   const phantomCard = useRef<HTMLDivElement | null>(null);
   const [dropZone, setDropZone] = useState<number | null>(null);
   const [dropColumn, setDropColumn] = useState<string | null>(null);
+  const [animating, setAnimating] = useState(false);
   const dCard = useMemo(
     () => kstore.cards.find((c) => c.id === dragged),
     [kstore.cards, dragged],
@@ -23,9 +23,14 @@ export default function InteractiveColumns() {
   useEffect(() => {
     const mouseHandler = (e: MouseEvent) => {
       if (phantomCard.current === null) return;
-      phantomCard.current!.style.left = `${e.x - 20}px`;
-      phantomCard.current!.style.top = `${e.y - 20}px`;
-      if (dragged === null || phantomCard.current === null) return;
+
+      requestAnimationFrame(() => {
+        if (!phantomCard.current) return;
+        phantomCard.current.style.transform = `translate(${e.clientX - 20}px, ${e.clientY - 20}px)`;
+      });
+
+      if (dragged === null) return;
+
       const elems = document.querySelectorAll(
         `.drop-zone` + `.column-${dropColumn}`,
       );
@@ -41,58 +46,82 @@ export default function InteractiveColumns() {
       if (dCard!.column_id === dropColumn && index - dCard!.position === 1) {
         index -= 1;
       }
-      // const newPosition =
-      //   dCard!.column_id === dropColumn
-      //     ? index <= dCard!.position
-      //       ? index
-      //       : index - 1
-      //     : index;
-      // console.log(newPosition);
 
       setDropZone(index);
     };
-    document.addEventListener("mousemove", mouseHandler);
+
+    if (dragged !== null) {
+      document.addEventListener("mousemove", mouseHandler, { passive: true });
+    }
     return () => document.removeEventListener("mousemove", mouseHandler);
   }, [dCard, dragged, dropColumn]);
 
   function onReorderEnd(e: React.MouseEvent) {
     e.preventDefault();
-    if (dropZone === null || dropColumn === null) return;
+    if (dropZone === null || dropColumn === null || animating) return;
+
     const newPosition =
       dCard!.column_id === dropColumn
         ? dropZone <= dCard!.position
           ? dropZone
           : dropZone - 1
         : dropZone;
-    // if (document.startViewTransition) document.startViewTransition();
+
+    setAnimating(true);
+
+    const cards = document.querySelectorAll(".kanban-card");
+    const positions = Array.from(cards).map((card) => {
+      const rect = card.getBoundingClientRect();
+      return { top: rect.top, left: rect.left };
+    });
+
     kstore.reorderList(dCard!.column_id, dropColumn!, newPosition, dCard!.id);
-    // console.log(
-    //   "reorder",
-    //   dCard!.position,
-    //   newPosition,
-    //   "diff columns:",
-    //   dCard!.column_id !== dropColumn,
-    // );
-    setDropZone(null);
-    setDropColumn(null);
-    setDragged(null);
+
+    requestAnimationFrame(() => {
+      cards.forEach((card, i) => {
+        const rect = card.getBoundingClientRect();
+        const dx = positions[i].left - rect.left;
+        const dy = positions[i].top - rect.top;
+
+        if (dx !== 0 || dy !== 0) {
+          card.animate(
+            [
+              { transform: `translate(${dx}px, ${dy}px)` },
+              { transform: "translate(0, 0)" },
+            ],
+            {
+              duration: 200,
+              easing: "ease-out",
+            },
+          );
+        }
+      });
+
+      setTimeout(() => {
+        setAnimating(false);
+        setDropZone(null);
+        setDropColumn(null);
+        setDragged(null);
+      }, 100);
+    });
   }
 
   return (
     <>
       {dragged !== null && (
         <div
-          className={clsx(
-            "phantom-card pointer-events-none fixed w-full max-w-[250px] z-50",
-            { invisible: !phantomCard.current },
-          )}
+          className="phantom-card pointer-events-none fixed z-50 w-full max-w-[250px] will-change-transform"
           style={{
-            viewTransitionName: `phantom-${dragged}`,
-            contain: 'paint layout style',
+            position: "fixed",
+            left: 0,
+            top: 0,
+            transform: "translate(0, 0)",
+            opacity: phantomCard.current ? 1 : 0,
+            transition: "opacity 0.2s ease-out",
           }}
           ref={phantomCard}
         >
-          <KanbanCard card={dCard!} />
+          <KanbanCard card={dCard!} className="kanban-card cursor-grabbing" />
         </div>
       )}
       {kstore.columns.map((col) => (

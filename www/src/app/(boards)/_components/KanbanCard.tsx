@@ -35,7 +35,7 @@ export default function KanbanCard({
     <Link
       href={`/dashboard/${kstore.id}/card/${card.id}`}
       className={cn(
-        "flex w-full flex-row justify-between gap-2 rounded-lg border border-neutral-300 bg-neutral-200 px-4 py-2 text-neutral-800 shadow-md transition-all hover:bg-neutral-300 hover:shadow-lg",
+        "kanban-card flex w-full cursor-grab touch-none flex-row justify-between gap-2 rounded-lg border border-neutral-300 bg-neutral-200 px-4 py-2 text-neutral-800 shadow-md transition-all duration-200 ease-in-out hover:bg-neutral-300 hover:shadow-lg active:cursor-grabbing",
         className,
       )}
       {...props}
