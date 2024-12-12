@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::schema::column_card;
+pub mod api_response;
 
 #[derive(Serialize, Deserialize)]
 pub struct PubUser {

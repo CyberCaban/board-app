@@ -1,8 +1,9 @@
 use rocket::serde::json::Json;
+use rocket::http::Status;
 use serde_json::{json, Value};
 use diesel::result::Error as DieselError;
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Debug)]
 pub enum ApiErrorType {
     Unauthorized,
     InvalidToken,
@@ -12,7 +13,10 @@ pub enum ApiErrorType {
     YouDoNotOwnThisFile,
     FailedToParseUUID,
     NotFound,
-    FailedToDeleteFile
+    FailedToDeleteFile,
+    UnknownError,
+    InternalServerError,
+    Other(String),
 }
 
 impl ToString for ApiErrorType {
@@ -27,52 +31,88 @@ impl ToString for ApiErrorType {
             ApiErrorType::FailedToParseUUID => "Failed to parse UUID".to_string(),
             ApiErrorType::NotFound => "Not Found".to_string(),
             ApiErrorType::FailedToDeleteFile => "Failed to delete file".to_string(),
+            ApiErrorType::UnknownError => "Unknown Error".to_string(),
+            ApiErrorType::InternalServerError => "Internal Server Error".to_string(),
+            ApiErrorType::Other(error) => error.to_string(),
+        }
+    }
+}
+
+impl From<String> for ApiErrorType {
+    fn from(error: String) -> Self {
+        match error.as_str() {
+            "Unauthorized" => ApiErrorType::Unauthorized,
+            "Invalid Token" => ApiErrorType::InvalidToken,
+            "Invalid File Type" => ApiErrorType::InvalidFileType,
+            "User Already Exists" => ApiErrorType::UserAlreadyExists,
+            "User Not Found" => ApiErrorType::UserNotFound,
+            "You do not own this file" => ApiErrorType::YouDoNotOwnThisFile,
+            "Failed to parse UUID" => ApiErrorType::FailedToParseUUID,
+            "Not Found" => ApiErrorType::NotFound,
+            "Failed to delete file" => ApiErrorType::FailedToDeleteFile,
+            _ => ApiErrorType::Other(error),
         }
     }
 }
 
 #[derive(serde::Serialize, Debug)]
 pub struct ApiError {
-    error_type: String,
+    error_type: ApiErrorType,
     error_msg: String,
 }
 impl ApiError {
     pub fn unknown_error() -> Self {
         eprintln!("Unknown error");
         ApiError {
-            error_type: "Unknown Error".to_string(),
+            error_type: ApiErrorType::UnknownError,
             error_msg: "Unknown Error".to_string(),
         }
     }
     pub fn from_message(message: String) -> Self {
         eprintln!("Error message: {}", message);
         ApiError {
-            error_type: "Internal Server Error".to_string(),
+            error_type: ApiErrorType::UnknownError,
             error_msg: message,
         }
     }
     pub fn from_error<E: std::error::Error + 'static>(error: E) -> Self {
         eprintln!("Error: {}", error);
         ApiError {
-            error_type: "Internal Server Error".to_string(),
+            error_type: ApiErrorType::InternalServerError,
             error_msg: error.to_string(),
         }
     }
     pub fn new(error_type: &str, error_msg: impl ToString) -> Self {
-        eprintln!("Error: {} {}", error_type, error_msg.to_string());
+        dbg!(&error_type);
         ApiError {
-            error_type: error_type.to_string(),
+            error_type: error_type.to_string().clone().into(),
             error_msg: error_msg.to_string(),
         }
     }
     pub fn from_type(error_type: ApiErrorType) -> Self {
+        dbg!(&error_type);
+        let error_msg = error_type.to_string().clone();
         ApiError {
-            error_type: error_type.to_string(),
-            error_msg: error_type.to_string(),
+            error_type,
+            error_msg,
         }
     }
     pub fn to_json(&self) -> Json<Value> {
         Json(json!(self))
+    }
+    pub fn status(&self) -> Status {
+        dbg!(&self.error_type);
+        match self.error_type {
+            ApiErrorType::Unauthorized => Status::Unauthorized,
+            ApiErrorType::NotFound => Status::NotFound,
+            ApiErrorType::InvalidToken => Status::Unauthorized,
+            ApiErrorType::InvalidFileType => Status::BadRequest,
+            ApiErrorType::UserAlreadyExists => Status::Conflict,
+            ApiErrorType::UserNotFound => Status::NotFound,
+            ApiErrorType::YouDoNotOwnThisFile => Status::Forbidden,
+            ApiErrorType::FailedToParseUUID => Status::BadRequest,
+            _ => Status::InternalServerError,
+        }
     }
 }
 
