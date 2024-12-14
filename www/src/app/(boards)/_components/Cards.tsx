@@ -28,9 +28,9 @@ export default function Cards({
     : undefined;
 
   return (
-    <div className="flex max-w-full flex-col">
+    <div className="flex max-w-full flex-col overflow-y-auto">
       <div
-        className="relative flex flex-col gap-2 overflow-y-auto"
+        className="relative flex flex-col gap-2"
         style={{
           maxHeight: "calc(100vh - 200px)",
         }}
