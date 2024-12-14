@@ -57,7 +57,6 @@ export default function KanbanColumn({
         <DropdownMenu>
           <DropdownMenuTrigger
             key={id}
-            asChild
             className="ml-2 h-auto w-auto self-start bg-transparent px-2 py-1 font-bold"
           >
             ...
