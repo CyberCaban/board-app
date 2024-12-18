@@ -1,4 +1,5 @@
 "use client";
+import { isImage } from "@/utils/utils";
 import Image from "next/image";
 // import Link from "next/link";
 
@@ -17,17 +18,13 @@ export default function ImagesMasonry({
       <div className="columns-2 gap-4 space-y-4 sm:columns-3 md:columns-3 lg:columns-5 xl:columns-6">
         {imagesURL &&
           imagesURL.map((image) => {
-            if (
-              !image.endsWith(".jpg") &&
-              !image.endsWith(".png") &&
-              !image.endsWith(".jpeg")
-            ) {
+            if (!isImage(image)) {
               return (
                 <div
                   className="group relative h-auto w-full rounded-md border-2 border-white p-4"
                   key={image}
                 >
-                  <a href={image} target="_blank" rel="noopener noreferrer">
+                  <a href={image} target="_blank" rel="noopener noreferrer" download>
                     <h3>{image.split("/").pop()}</h3>
                   </a>
                   <button

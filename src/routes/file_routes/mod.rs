@@ -1,14 +1,13 @@
 use diesel::{BoolExpressionMethods, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
-use rocket::fs::NamedFile;
-use rocket::serde::json::Json;
 use rocket::tokio::io::AsyncReadExt;
-use rocket::{form::Form, fs::TempFile, http::CookieJar};
+use rocket::{form::Form, fs::TempFile};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::validate_user_token;
 use crate::database::Db;
 use crate::errors::{ApiError, ApiErrorType};
+use crate::models::api_response::ApiResponse;
+use crate::models::auth::AuthResult;
 use crate::models::{UploadedFile, User};
 use crate::schema::{files, users};
 
@@ -23,12 +22,12 @@ pub struct UploadRequest<'r> {
 pub async fn api_upload_file(
     form: Form<UploadRequest<'_>>,
     db: Db,
-    cookies: &CookieJar<'_>,
-) -> Result<Json<Value>, Json<Value>> {
+    auth: AuthResult,
+) -> Result<ApiResponse<String>, ApiResponse> {
     if form.file.content_type().is_none() {
-        return Err(ApiError::new("InvalidFileType", "Invalid file type").to_json());
+        return Err(ApiResponse::from_error_type(ApiErrorType::InvalidFileType));
     }
-    let uploader_id = validate_user_token!(cookies);
+    let uploader_id = auth.unpack()?.id;
 
     let filename = form.filename.clone();
     let file_ext = match form.file.content_type() {
@@ -44,7 +43,8 @@ pub async fn api_upload_file(
     let is_private = form.is_private;
     let file_name = format!("{}-{}.{}", Uuid::new_v4(), filename, file_ext);
     let file_name_clone = file_name.clone();
-    let transaction = db
+
+    match db
         .run(move |conn| {
             conn.transaction(|conn| {
                 let _ = users::table
@@ -62,9 +62,9 @@ pub async fn api_upload_file(
                 Ok::<(), diesel::result::Error>(())
             })
         })
-        .await;
-    match transaction {
-        Err(e) => return Err(ApiError::from_error(e).to_json()),
+        .await
+    {
+        Err(e) => return Err(ApiResponse::from_error(e.into())),
         Ok(_) => {
             let mut file = form.file.open().await.unwrap();
             let mut buf = Vec::new();
@@ -78,40 +78,8 @@ pub async fn api_upload_file(
                 std::fs::create_dir_all(format!("tmp/{}", uploader_id)).unwrap();
             }
             std::fs::write(file_path, buf).unwrap();
-            Ok(Json(json!(file_name_clone)))
+            Ok(ApiResponse::new(file_name_clone))
         }
-    }
-}
-
-#[get("/file/<file_name>")]
-pub async fn api_get_file(
-    file_name: String,
-    db: Db,
-    cookies: &CookieJar<'_>,
-) -> Result<NamedFile, Json<Value>> {
-    let uploader_id = validate_user_token!(cookies);
-    let file_name_clone = file_name.clone();
-
-    let found_file = db
-        .run(move |conn| {
-            files::table
-                .filter(files::name.eq(file_name_clone))
-                .filter(files::user_id.eq(uploader_id))
-                .first::<UploadedFile>(conn)
-        })
-        .await;
-    match found_file {
-        Ok(f) => {
-            let file_path = if f.private {
-                format!("tmp/{}/{}", uploader_id, file_name)
-            } else {
-                format!("tmp/{}", file_name)
-            };
-            NamedFile::open(file_path)
-                .await
-                .map_err(|e| (ApiError::from_error(e).to_json()))
-        }
-        Err(_) => Err(ApiError::from_type(ApiErrorType::NotFound).to_json()),
     }
 }
 
@@ -119,57 +87,65 @@ pub async fn api_get_file(
 pub async fn api_delete_file(
     file_name: String,
     db: Db,
-    cookies: &CookieJar<'_>,
-) -> Result<Json<Value>, Json<Value>> {
-    let uploader_id = validate_user_token!(cookies);
+    auth: AuthResult,
+) -> Result<ApiResponse<String>, ApiResponse> {
+    let uploader_id = auth.unpack()?.id;
     let file_name_clone = file_name.clone();
-    db.run(move |conn| {
-        conn.transaction(|conn| {
-            let f = files::table
-                .filter(
-                    files::name
-                        .eq(file_name_clone)
-                        .and(files::user_id.eq(uploader_id)),
-                )
-                .first::<UploadedFile>(conn)
-                .map_err(|_| ApiError::from_type(ApiErrorType::YouDoNotOwnThisFile))?;
-            diesel::delete(files::table.filter(files::id.eq(f.id))).execute(conn)?;
-            Ok::<UploadedFile, diesel::result::Error>(f)
+    match db
+        .run(move |conn| {
+            conn.transaction(|conn| {
+                let f = files::table
+                    .filter(
+                        files::name
+                            .eq(file_name_clone)
+                            .and(files::user_id.eq(uploader_id)),
+                    )
+                    .first::<UploadedFile>(conn)
+                    .map_err(|_| ApiError::from_type(ApiErrorType::YouDoNotOwnThisFile))?;
+                diesel::delete(files::table.filter(files::id.eq(f.id))).execute(conn)?;
+                Ok::<UploadedFile, diesel::result::Error>(f)
+            })
         })
-    })
-    .await
-    .map(|f| {
-        let file_path = if f.private {
-            format!("tmp/{}/{}", uploader_id, file_name)
-        } else {
-            format!("tmp/{}", file_name)
-        };
-        std::fs::remove_file(file_path).unwrap();
-        Json(json!("File deleted"))
-    })
-    .map_err(|e| ApiError::from_error(e).to_json())
+        .await
+    {
+        Ok(f) => {
+            let file_path = if f.private {
+                format!("tmp/{}/{}", uploader_id, file_name)
+            } else {
+                format!("tmp/{}", file_name)
+            };
+            std::fs::remove_file(file_path).unwrap();
+            Ok(ApiResponse::new(file_name))
+        }
+        Err(e) => Err(ApiResponse::from_error(e.into())),
+    }
 }
 
 #[get("/files")]
-pub async fn api_get_files(db: Db, cookies: &CookieJar<'_>) -> Result<Json<Value>, Json<Value>> {
-    if cookies.get("token").is_none() {
-        return db
+pub async fn api_get_files(db: Db, auth: AuthResult) -> Result<ApiResponse<Value>, ApiResponse> {
+    if auth.is_err() {
+        return match db
             .run(move |conn| {
                 files::table
                     .filter(files::private.eq(false))
                     .load::<UploadedFile>(conn)
             })
             .await
-            .map(|files| Json(json!(files)))
-            .map_err(|e| (ApiError::from_error(e).to_json()));
+        {
+            Ok(files) => Ok(ApiResponse::new(json!(files))),
+            Err(e) => Err(ApiResponse::from_error(e.into())),
+        };
     }
-    let uploader_id = validate_user_token!(cookies);
-    db.run(move |conn| {
-        files::table
-            .filter(files::private.eq(false).or(files::user_id.eq(uploader_id)))
-            .load::<UploadedFile>(conn)
-    })
-    .await
-    .map(|files| Json(json!(files)))
-    .map_err(|e| (ApiError::from_error(e).to_json()))
+    let uploader_id = auth.unpack()?.id;
+    match db
+        .run(move |conn| {
+            files::table
+                .filter(files::private.eq(false).or(files::user_id.eq(uploader_id)))
+                .load::<UploadedFile>(conn)
+        })
+        .await
+    {
+        Ok(files) => Ok(ApiResponse::new(json!(files))),
+        Err(e) => Err(ApiResponse::from_error(e.into())),
+    }
 }

@@ -3,6 +3,7 @@ export async function postData(url: string, data: unknown) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${getCookie("token")}`,
     },
     body: JSON.stringify(data),
   })
@@ -18,6 +19,9 @@ export async function postData(url: string, data: unknown) {
 export async function postFormData(url: string, data: FormData) {
   return fetch(`${url}`, {
     method: "POST",
+    headers: {
+      Authorization: `Bearer ${getCookie("token")}`,
+    },
     body: data,
   })
     .then((response) => response.json())
@@ -34,6 +38,7 @@ export async function putData(url: string, data: unknown) {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${getCookie("token")}`,
     },
     body: JSON.stringify(data),
   })
@@ -47,7 +52,13 @@ export async function putData(url: string, data: unknown) {
 }
 
 export async function getData(url: string, fetchOptions?: RequestInit) {
-  return fetch(url, fetchOptions)
+  return fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getCookie("token")}`,
+    },
+    ...fetchOptions,
+  })
     .then((response) => response.json())
     .then((res) => {
       if (res.error_msg) {
@@ -58,7 +69,10 @@ export async function getData(url: string, fetchOptions?: RequestInit) {
 }
 
 export async function deleteData(url: string) {
-  return fetch(url, { method: "DELETE" })
+  return fetch(url, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${getCookie("token")}` },
+  })
     .then((response) => response.json())
     .then((res) => {
       if (res.error_msg) {

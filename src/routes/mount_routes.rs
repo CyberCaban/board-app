@@ -8,7 +8,6 @@ impl AuthorizationRoutes for Rocket<Build> {
             "/api",
             routes![
                 file_routes::api_upload_file,
-                file_routes::api_get_file,
                 file_routes::api_delete_file,
                 file_routes::api_get_files,
                 routes::api_get_user,
