@@ -1,9 +1,9 @@
-use rocket::serde::json::Json;
-use rocket::http::Status;
-use serde_json::{json, Value};
 use diesel::result::Error as DieselError;
+use rocket::http::Status;
+use rocket::serde::json::Json;
+use serde_json::{json, Value};
 
-#[derive(serde::Serialize, Debug)]
+#[derive(serde::Serialize, Debug, PartialEq, Clone)]
 pub enum ApiErrorType {
     Unauthorized,
     InvalidToken,
@@ -83,14 +83,14 @@ impl ApiError {
         }
     }
     pub fn new(error_type: &str, error_msg: impl ToString) -> Self {
-        dbg!(&error_type);
+        eprintln!("Error: {}", &error_msg.to_string());
         ApiError {
             error_type: error_type.to_string().clone().into(),
             error_msg: error_msg.to_string(),
         }
     }
     pub fn from_type(error_type: ApiErrorType) -> Self {
-        dbg!(&error_type);
+        eprintln!("Error: {}", &error_type.to_string());
         let error_msg = error_type.to_string().clone();
         ApiError {
             error_type,
@@ -101,7 +101,7 @@ impl ApiError {
         Json(json!(self))
     }
     pub fn status(&self) -> Status {
-        dbg!(&self.error_type);
+        // dbg!(&self.error_type);
         match self.error_type {
             ApiErrorType::Unauthorized => Status::Unauthorized,
             ApiErrorType::NotFound => Status::NotFound,
@@ -128,16 +128,10 @@ impl From<DieselError> for ApiError {
 impl From<ApiError> for DieselError {
     fn from(error: ApiError) -> Self {
         DieselError::DatabaseError(
-            diesel::result::DatabaseErrorKind::Unknown, 
-            Box::new(error.error_msg)
+            diesel::result::DatabaseErrorKind::Unknown,
+            Box::new(error.error_msg),
         )
     }
-}
-
-#[derive(serde::Serialize)]
-enum ApiResponse {
-    Ok,
-    Err,
 }
 
 #[derive(serde::Serialize)]

@@ -1,7 +1,6 @@
 use diesel::query_dsl::methods::FilterDsl;
 use diesel::{ExpressionMethods, RunQueryDsl};
-use rocket::http::{Cookie, CookieJar, Status};
-use rocket::request::FromRequest;
+use rocket::http::{Cookie, CookieJar};
 use rocket::response::content::RawHtml;
 use rocket::serde::json::Json;
 use rocket::time::{Duration, OffsetDateTime};
@@ -12,6 +11,7 @@ use crate::database::Db;
 use crate::errors::ApiErrorType;
 use crate::errors::{ApiError, LoginError, RegisterError};
 use crate::models::api_response::ApiResponse;
+use crate::models::auth::{Auth, AuthResult};
 use crate::models::User;
 use crate::schema::users::{self, dsl::*};
 use crate::validate_user_token;
@@ -32,30 +32,19 @@ pub struct UpdateUser {
 }
 
 #[get("/user")]
-pub async fn api_get_user(
-    db: Db,
-    jar: &CookieJar<'_>,
-) -> Result<ApiResponse<User>, ApiResponse<Value>> {
-    // let user_token = validate_user_token!(jar);
-    let user_token = match jar.get("token") {
-        Some(cookie) => match Uuid::parse_str(cookie.value_trimmed()) {
-            Ok(upl_id) => upl_id,
-            Err(_) => {
-                return Err(ApiResponse::error(ApiError::from_type(
-                    ApiErrorType::InvalidToken,
-                )))
-            }
-        },
-        None => {
-            return Err(ApiResponse::error(ApiError::from_type(
-                ApiErrorType::Unauthorized,
-            )))
-        }
-    };
-    db.run(move |conn| users::table.filter(users::id.eq(user_token)).first(conn))
+pub async fn api_get_user(db: Db, auth: AuthResult) -> Result<ApiResponse<User>, ApiResponse> {
+    let auth = auth.unpack()?;
+    match db
+        .run(move |conn| {
+            users::table
+                .filter(users::id.eq(auth.id))
+                .first::<User>(conn)
+        })
         .await
-        .map(|user| ApiResponse::new(user, Status::Ok))
-        .map_err(|e| ApiResponse::error(e.into()))
+    {
+        Ok(user) => Ok(ApiResponse::new(user)),
+        Err(e) => Err(ApiResponse::from_error(e.into())),
+    }
 }
 
 #[post("/register", format = "json", data = "<user>")]

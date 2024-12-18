@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::schema::column_card;
 pub mod api_response;
+pub mod auth;
 
 #[derive(Serialize, Deserialize)]
 pub struct PubUser {
