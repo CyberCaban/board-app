@@ -8,10 +8,10 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::database::Db;
-use crate::errors::{ApiError, LoginError, RegisterError};
+use crate::errors::{ApiError, ApiErrorType, LoginError, RegisterError};
 use crate::models::api_response::ApiResponse;
 use crate::models::auth::AuthResult;
-use crate::models::User;
+use crate::models::{PubUser, User};
 use crate::schema::users::{self, dsl::*};
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -30,7 +30,7 @@ pub struct UpdateUser {
 }
 
 #[get("/user")]
-pub async fn api_get_user(db: Db, auth: AuthResult) -> Result<ApiResponse<User>, ApiResponse> {
+pub async fn api_get_self(db: Db, auth: AuthResult) -> Result<ApiResponse<User>, ApiResponse> {
     let auth = auth.unpack()?;
     match db
         .run(move |conn| {
@@ -41,6 +41,30 @@ pub async fn api_get_user(db: Db, auth: AuthResult) -> Result<ApiResponse<User>,
         .await
     {
         Ok(user) => Ok(ApiResponse::new(user)),
+        Err(e) => Err(ApiResponse::from_error(e.into())),
+    }
+}
+
+#[get("/user/<user_id>")]
+pub async fn api_get_user(
+    db: Db,
+    user_id: String,
+) -> Result<ApiResponse<PubUser>, ApiResponse> {
+    let user_id = Uuid::parse_str(&user_id).map_err(|_| {
+        ApiResponse::from_error(ApiError::new(
+            "InvalidUserId",
+            ApiErrorType::InvalidUserId,
+        ))
+    })?;
+    match db
+        .run(move |conn| {
+            users::table
+                .filter(users::id.eq(user_id))
+                .first::<User>(conn)
+        })
+        .await
+    {
+        Ok(user) => Ok(ApiResponse::new(PubUser::from(user))),
         Err(e) => Err(ApiResponse::from_error(e.into())),
     }
 }

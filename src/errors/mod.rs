@@ -18,6 +18,7 @@ pub enum ApiErrorType {
     InternalServerError,
     InvalidUserId,
     InvalidRequest,
+    AlreadyFriends,
     Other(String),
 }
 
@@ -37,6 +38,7 @@ impl ToString for ApiErrorType {
             ApiErrorType::InternalServerError => "Internal Server Error".to_string(),
             ApiErrorType::InvalidUserId => "Invalid User Id".to_string(),
             ApiErrorType::InvalidRequest => "Invalid Request".to_string(),
+            ApiErrorType::AlreadyFriends => "Already Friends".to_string(),
             ApiErrorType::Other(error) => error.to_string(),
         }
     }
@@ -56,6 +58,7 @@ impl From<String> for ApiErrorType {
             "Failed to delete file" => ApiErrorType::FailedToDeleteFile,
             "Invalid User Id" => ApiErrorType::InvalidUserId,
             "Invalid Request" => ApiErrorType::InvalidRequest,
+            "Already Friends" => ApiErrorType::AlreadyFriends,
             _ => ApiErrorType::Other(error),
         }
     }

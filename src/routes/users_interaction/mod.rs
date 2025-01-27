@@ -1,5 +1,5 @@
 use diesel::{
-    dsl::now, BoolExpressionMethods, ExpressionMethods, PgArrayExpressionMethods, QueryDsl,
+    BoolExpressionMethods, Connection, ExpressionMethods, PgArrayExpressionMethods, QueryDsl,
     RunQueryDsl, SelectableHelper,
 };
 use serde_json::{json, Value};
@@ -31,14 +31,33 @@ pub async fn frend_request_send(
     let token = auth.unpack()?.id;
     let tr = db
         .run(move |conn| {
-            diesel::insert_into(friends_requests::table)
-                .values(NewFriendRequest {
-                    sender_id: token,
-                    receiver_id: user,
-                })
-                .on_conflict_do_nothing() 
-                .returning(friends_requests::id)
-                .get_result::<Uuid>(conn)
+            conn.transaction(|conn| {
+                let is_friends = users::table
+                    .filter(
+                        users::id.eq_any(vec![token, user]).and(
+                            users::friends
+                                .contains(vec![user])
+                                .or(users::friends.contains(vec![token])),
+                        ),
+                    )
+                    .count()
+                    .get_result::<i64>(conn);
+                if is_friends? > 0 {
+                    return Err(ApiError::new(
+                        "AlreadyFriends",
+                        ApiErrorType::AlreadyFriends,
+                    ));
+                }
+                let id = diesel::insert_into(friends_requests::table)
+                    .values(NewFriendRequest {
+                        sender_id: token,
+                        receiver_id: user,
+                    })
+                    .on_conflict_do_nothing()
+                    .returning(friends_requests::id)
+                    .get_result::<Uuid>(conn)?;
+                Ok(id)
+            })
         })
         .await;
     match tr {
