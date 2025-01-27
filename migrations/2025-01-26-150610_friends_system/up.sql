@@ -4,7 +4,7 @@ ALTER TABLE users ADD COLUMN friends uuid[] default '{}';
 CREATE INDEX friends_idx ON users (friends);
 
 CREATE TABLE friends_requests (
-    id uuid primary key,
+    id uuid primary key DEFAULT uuid_generate_v4 (),
     sender_id uuid not null references users (id),
     receiver_id uuid not null references users (id),
     created_at timestamp not null default now(),

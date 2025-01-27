@@ -12,7 +12,14 @@ use crate::{
     schema::{friends_requests, users},
 };
 
-#[post("/send", data = "<user>")]
+/// # POST /friends/send/<user>
+/// Sends a friend request
+/// # Arguments
+/// * user - The id of the user you want to friend
+/// * auth - The token of the user
+/// # Returns
+/// * friend_request_id - The id of the friend request
+#[post("/send/<user>")]
 pub async fn frend_request_send(
     db: Db,
     auth: AuthResult,
@@ -29,9 +36,7 @@ pub async fn frend_request_send(
                     sender_id: token,
                     receiver_id: user,
                 })
-                .on_conflict(friends_requests::sender_id)
-                .do_update()
-                .set(friends_requests::updated_at.eq(now))
+                .on_conflict_do_nothing() 
                 .returning(friends_requests::id)
                 .get_result::<Uuid>(conn)
         })
@@ -42,6 +47,13 @@ pub async fn frend_request_send(
     }
 }
 
+/// # DELETE /friends/cancel/<user_id>
+/// Cancels a friend request
+/// # Arguments
+/// * user_id - The id of the user you want to cancel the friend request
+/// * auth - The token of the user
+/// # Returns
+/// * Ok - If the request was cancelled
 #[delete("/cancel/<user_id>")]
 pub async fn frend_request_cancel(
     db: Db,
@@ -76,7 +88,25 @@ pub async fn frend_request_cancel(
     }
 }
 
-#[get("/requests")]
+/// # GET /friends
+/// Returns a list of all the friend requests of the user
+/// # Arguments
+/// * auth - The token of the user
+/// # Returns
+/// * requests - A list of all the friend requests of the user
+/// ```json
+/// [
+///     {
+///         "id": <request_id>,
+///         "sender_id": <sender_id>,
+///         "receiver_id": <receiver_id>,
+///         "created_at": <created_at>,
+///         "updated_at": <updated_at>,
+///     },
+///     ...
+/// ]
+/// ```
+#[get("/")]
 pub async fn frend_requests_list(
     db: Db,
     auth: AuthResult,
@@ -100,6 +130,13 @@ pub async fn frend_requests_list(
     }
 }
 
+/// # POST /friends/accept/<request_id>
+/// Accepts a friend request
+/// # Arguments
+/// * request_id - The id of the friend request
+/// * auth - The token of the user
+/// # Returns
+/// * Ok - If the request was accepted
 #[post("/accept/<request_id>")]
 pub async fn frend_request_accept(
     db: Db,
@@ -150,7 +187,7 @@ pub async fn frend_request_accept(
             diesel::update(users::table.filter(users::id.eq(receiver_id)))
                 .set(users::friends.eq(receiver_friends))
                 .execute(conn)?;
-            diesel::update(users::table.filter(users::id.eq(request_id)))
+            diesel::update(users::table.filter(users::id.eq(sender_id)))
                 .set(users::friends.eq(sender_friends))
                 .execute(conn)?;
             Ok::<(), ApiError>(())
@@ -162,6 +199,13 @@ pub async fn frend_request_accept(
     }
 }
 
+/// # DELETE /friends/decline/<request_id>
+/// Declines a friend request
+/// # Arguments
+/// * request_id - The id of the friend request
+/// * auth - The token of the user
+/// # Returns
+/// * Ok - If the request was declined
 #[delete("/decline/<request_id>")]
 pub async fn frend_request_decline(
     db: Db,
