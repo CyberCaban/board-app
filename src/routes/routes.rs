@@ -84,6 +84,7 @@ pub async fn api_register(
                     password: user.password.to_string(),
                     profile_url: None,
                     bio: None,
+                    friends: None,
                 })
                 .on_conflict(users::username)
                 .do_nothing()
