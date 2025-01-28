@@ -2,6 +2,7 @@
 import AvailableBoards from "../_components/AvailableBoards";
 import CreateBoardForm from "../_components/CreateBoardForm";
 
+// TODO: redirect to sign in if not signed
 export default function Board() {
     return (
         <>

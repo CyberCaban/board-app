@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getData, putData } from "@/utils/utils";
 
+// TODO: redirect on signin if not signed
+
 const formSchema = z.object({
   username: z.string().min(3).max(20),
   profile_url: z.string(),

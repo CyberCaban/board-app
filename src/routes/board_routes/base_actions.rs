@@ -21,6 +21,8 @@ use crate::{
     validate_user_token,
 };
 
+// TODO: extract complicated functions
+
 /// # POST /boards
 /// Creates a new board
 /// # Arguments
