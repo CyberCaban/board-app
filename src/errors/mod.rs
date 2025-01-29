@@ -19,6 +19,7 @@ pub enum ApiErrorType {
     InvalidUserId,
     InvalidRequest,
     AlreadyFriends,
+    WrongPassword,
     EmptyFields,
     Other(String),
 }
@@ -41,6 +42,7 @@ impl ToString for ApiErrorType {
             ApiErrorType::InvalidRequest => "Invalid Request".to_string(),
             ApiErrorType::AlreadyFriends => "Already Friends".to_string(),
             ApiErrorType::EmptyFields => "Empty Fields".to_string(),
+            ApiErrorType::WrongPassword => "Wrong Password".to_string(),
             ApiErrorType::Other(error) => error.to_string(),
         }
     }
@@ -142,39 +144,5 @@ impl From<ApiError> for DieselError {
             diesel::result::DatabaseErrorKind::Unknown,
             Box::new(error.error_msg),
         )
-    }
-}
-
-#[derive(serde::Serialize)]
-pub enum RegisterError {
-    EmptyFields,
-    UserAlreadyExists,
-    WeakPassword,
-    EmptyPassword,
-}
-impl ToString for RegisterError {
-    fn to_string(&self) -> String {
-        match self {
-            RegisterError::UserAlreadyExists => "UserAlreadyExists".to_string(),
-            RegisterError::WeakPassword => "WeakPassword".to_string(),
-            RegisterError::EmptyFields => "EmptyFields".to_string(),
-            RegisterError::EmptyPassword => "EmptyPassword".to_string(),
-        }
-    }
-}
-pub enum LoginError {
-    UserNotFound,
-    WrongPassword,
-    EmptyPassword,
-    EmptyUsername,
-}
-impl ToString for LoginError {
-    fn to_string(&self) -> String {
-        match self {
-            LoginError::UserNotFound => "UserNotFound".to_string(),
-            LoginError::WrongPassword => "WrongPassword".to_string(),
-            LoginError::EmptyPassword => "EmptyPassword".to_string(),
-            LoginError::EmptyUsername => "EmptyUsername".to_string(),
-        }
     }
 }

@@ -8,11 +8,11 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::database::Db;
-use crate::errors::{ApiError, ApiErrorType, LoginError, RegisterError};
+use crate::errors::{ApiError, ApiErrorType};
 use crate::models::api_response::ApiResponse;
 use crate::models::auth::AuthResult;
 use crate::models::user::{LoginDTO, PubUser, SignupDTO, User};
-use crate::schema::users::{self, dsl::*};
+use crate::schema::users;
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct UpdateUser {
     username: String,
@@ -23,7 +23,7 @@ pub struct UpdateUser {
 }
 
 #[get("/user")]
-pub async fn api_get_self(db: Db, auth: AuthResult) -> Result<ApiResponse<User>, ApiResponse> {
+pub async fn api_get_self(db: Db, auth: AuthResult) -> Result<ApiResponse<PubUser>, ApiResponse> {
     let auth = auth.unpack()?;
     match db
         .run(move |conn| {
@@ -33,7 +33,7 @@ pub async fn api_get_self(db: Db, auth: AuthResult) -> Result<ApiResponse<User>,
         })
         .await
     {
-        Ok(user) => Ok(ApiResponse::new(user)),
+        Ok(user) => Ok(ApiResponse::new(user.into())),
         Err(e) => Err(ApiResponse::from_error(e.into())),
     }
 }
@@ -51,7 +51,7 @@ pub async fn api_get_user(db: Db, user_id: String) -> Result<ApiResponse<PubUser
         })
         .await
     {
-        Ok(user) => Ok(ApiResponse::new(PubUser::from(user))),
+        Ok(user) => Ok(ApiResponse::new(user.into())),
         Err(e) => Err(ApiResponse::from_error(e.into())),
     }
 }

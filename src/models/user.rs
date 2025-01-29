@@ -1,17 +1,9 @@
-use diesel::{
-    query_dsl::methods::FilterDsl, BoolExpressionMethods, ExpressionMethods, Insertable,
-    PgConnection, Queryable, QueryableByName, RunQueryDsl, Selectable,
-};
+use diesel::{ExpressionMethods, Insertable, QueryDsl, Queryable, RunQueryDsl, Selectable};
 use rocket::http::CookieJar;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{
-    database::Db,
-    errors::{ApiError, RegisterError},
-    jwt,
-    schema::users,
-};
+use crate::{database::Db, errors::ApiError, jwt, schema::users};
 
 use super::api_response::ApiResponse;
 use crate::errors::ApiErrorType::*;
@@ -22,8 +14,8 @@ use bcrypt::{hash, DEFAULT_COST};
 pub struct User {
     pub id: uuid::Uuid,
     pub username: String,
-    pub password: String,
     pub email: String,
+    pub password: String,
     pub profile_url: Option<String>,
     pub bio: Option<String>,
     pub friends: Option<Vec<Option<uuid::Uuid>>>,
@@ -54,7 +46,7 @@ pub struct SignupDTO {
     pub email: String,
     pub password: String,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct LoginDTO {
     pub email: String,
     pub password: String,
@@ -68,13 +60,29 @@ impl User {
         if user.email.is_empty() || user.username.is_empty() || user.password.is_empty() {
             return Err(ApiResponse::from_error(ApiError::from_type(EmptyFields)));
         }
+        let email = user.email.clone();
+        let users_with_same_email = db
+            .run(move |conn| {
+                users::table
+                    .filter(users::email.eq(email))
+                    .count()
+                    .get_result::<i64>(conn)
+                    .ok()
+            })
+            .await;
+        if let Some(count) = users_with_same_email {
+            if count > 0 {
+                return Err(ApiResponse::from_error_type(UserAlreadyExists));
+            }
+        }
         let hash = hash(user.password, DEFAULT_COST);
         if let Err(e) = hash {
             return Err(ApiResponse::from_error(ApiError::from_error(e)));
         }
         let user = SignupDTO {
             password: hash.unwrap(),
-            ..user
+            email: user.email,
+            username: user.username,
         };
         match db
             .run(move |conn| {
@@ -102,27 +110,30 @@ impl User {
     }
 
     pub async fn login(
-        user: LoginDTO,
+        login_info: LoginDTO,
         db: Db,
         jar: &CookieJar<'_>,
     ) -> Result<ApiResponse<PubUser>, ApiResponse<ApiError>> {
-        if user.email.is_empty() || user.password.is_empty() {
+        if login_info.email.is_empty() || login_info.password.is_empty() {
             return Err(ApiResponse::from_error(ApiError::from_type(EmptyFields)));
         }
-        let hash = hash(user.password, DEFAULT_COST);
-        if let Err(e) = hash {
-            return Err(ApiResponse::from_error(ApiError::from_error(e)));
-        }
-        let hashed_passwd = hash.unwrap();
         match db
             .run(move |conn| {
                 match users::table
-                    .filter(users::email.eq(user.email))
-                    .filter(users::password.eq(hashed_passwd))
+                    .filter(users::email.eq(login_info.email))
                     .first::<User>(conn)
                 {
-                    Err(_) => Err(ApiError::from_type(UserNotFound)),
-                    Ok(user) => Ok(user),
+                    Err(_) => Err::<User, ApiError>(ApiError::from_type(UserNotFound)),
+                    Ok(user) => match bcrypt::verify(login_info.password, &user.password) {
+                        Err(e) => Err(ApiError::from_error(e)),
+                        Ok(res) => {
+                            if res {
+                                Ok(user)
+                            } else {
+                                Err(ApiError::from_type(WrongPassword))
+                            }
+                        }
+                    },
                 }
             })
             .await

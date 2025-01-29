@@ -3,13 +3,13 @@ use std::convert::Infallible;
 use diesel::query_dsl::methods::FilterDsl;
 use diesel::{ExpressionMethods, RunQueryDsl};
 use rocket::request::*;
-use uuid::Uuid;
 
 use crate::errors::ApiErrorType;
+use crate::jwt::Token;
 use crate::{database::Db, schema::users};
 
 use super::api_response::ApiResponse;
-use super::User;
+use super::user::User;
 
 #[derive(Debug, PartialEq)]
 pub enum AuthResult {
@@ -53,8 +53,8 @@ impl<'r> FromRequest<'r> for AuthResult {
                 } else {
                     return Outcome::Success(AuthResult::Failure(ApiErrorType::InvalidToken));
                 };
-                let token = match Uuid::try_parse(token) {
-                    Ok(token) => token,
+                let user_data = match Token::decode_token(token.to_string()) {
+                    Ok(token) => token.claims.user,
                     Err(_) => {
                         return Outcome::Success(AuthResult::Failure(ApiErrorType::InvalidToken));
                     }
@@ -62,7 +62,11 @@ impl<'r> FromRequest<'r> for AuthResult {
 
                 let db = req.guard::<Db>().await.unwrap();
                 let user = db
-                    .run(move |conn| users::table.filter(users::id.eq(token)).first::<User>(conn))
+                    .run(move |conn| {
+                        users::table
+                            .filter(users::id.eq(user_data.id))
+                            .first::<User>(conn)
+                    })
                     .await;
                 match user {
                     Ok(user) => Outcome::Success(AuthResult::Success(Auth { id: user.id })),
