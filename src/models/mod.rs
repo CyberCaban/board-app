@@ -2,42 +2,12 @@ use diesel::{Insertable, Queryable, QueryableByName, Selectable};
 use rocket::fs::TempFile;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{NaiveDateTime, DateTime, Utc};
+use chrono::NaiveDateTime;
 
 use crate::schema::column_card;
 pub mod api_response;
 pub mod auth;
-
-#[derive(Serialize, Deserialize, Queryable, Selectable, Insertable, Debug)]
-#[diesel(table_name = crate::schema::users)]
-pub struct User {
-    pub id: uuid::Uuid,
-    pub username: String,
-    pub password: String,
-    pub profile_url: Option<String>,
-    pub bio: Option<String>,
-    pub friends: Option<Vec<Option<uuid::Uuid>>>,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct PubUser {
-    pub id: uuid::Uuid,
-    pub username: String,
-    pub profile_url: Option<String>,
-    pub bio: Option<String>,
-}
-
-impl From<User> for PubUser {
-    fn from(value: User) -> Self {
-        Self {
-            id: value.id,
-            username: value.username,
-            profile_url: value.profile_url,
-            bio: value.bio,
-        }
-    }
-}
-
+pub mod user;
 #[derive(Insertable, Queryable, Selectable, Serialize, Deserialize)]
 #[diesel(table_name = crate::schema::files)]
 pub struct UploadedFile {
@@ -199,7 +169,7 @@ macro_rules! validate_user_token {
                     .run(move |conn| {
                         crate::schema::users::table
                             .filter(crate::schema::users::id.eq(upl_id))
-                            .first::<crate::models::User>(conn)
+                            .first::<crate::models::user::User>(conn)
                     })
                     .await
                     .map_err(|_| ApiError::from_type(ApiErrorType::InvalidToken).to_json())

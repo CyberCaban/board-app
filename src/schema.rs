@@ -72,9 +72,10 @@ diesel::table! {
         #[max_length = 255]
         username -> Varchar,
         #[max_length = 255]
-        password -> Varchar,
+        email -> Varchar,
         #[max_length = 255]
-        profile_url -> Nullable<Varchar>,
+        password -> Varchar,
+        profile_url -> Nullable<Text>,
         #[max_length = 255]
         bio -> Nullable<Varchar>,
         friends -> Nullable<Array<Nullable<Uuid>>>,

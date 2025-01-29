@@ -11,15 +11,8 @@ use crate::database::Db;
 use crate::errors::{ApiError, ApiErrorType, LoginError, RegisterError};
 use crate::models::api_response::ApiResponse;
 use crate::models::auth::AuthResult;
-use crate::models::{PubUser, User};
+use crate::models::user::{LoginDTO, PubUser, SignupDTO, User};
 use crate::schema::users::{self, dsl::*};
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct NewUser {
-    username: String,
-    password: String,
-}
-
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct UpdateUser {
     username: String,
@@ -46,15 +39,9 @@ pub async fn api_get_self(db: Db, auth: AuthResult) -> Result<ApiResponse<User>,
 }
 
 #[get("/user/<user_id>")]
-pub async fn api_get_user(
-    db: Db,
-    user_id: String,
-) -> Result<ApiResponse<PubUser>, ApiResponse> {
+pub async fn api_get_user(db: Db, user_id: String) -> Result<ApiResponse<PubUser>, ApiResponse> {
     let user_id = Uuid::parse_str(&user_id).map_err(|_| {
-        ApiResponse::from_error(ApiError::new(
-            "InvalidUserId",
-            ApiErrorType::InvalidUserId,
-        ))
+        ApiResponse::from_error(ApiError::new("InvalidUserId", ApiErrorType::InvalidUserId))
     })?;
     match db
         .run(move |conn| {
@@ -72,106 +59,20 @@ pub async fn api_get_user(
 #[post("/register", format = "json", data = "<user>")]
 pub async fn api_register(
     db: Db,
-    user: Json<NewUser>,
+    user: Json<SignupDTO>,
     jar: &CookieJar<'_>,
-) -> Result<ApiResponse<User>, ApiResponse> {
-    let user = NewUser {
-        username: user.username.trim().to_string(),
-        password: user.password.trim().to_string(),
-    };
-
-    if user.username.is_empty() {
-        return Err(ApiResponse::from_error(ApiError::new(
-            "EmptyUsername",
-            RegisterError::EmptyUsername,
-        )));
-    }
-    if user.password.is_empty() {
-        return Err(ApiResponse::from_error(ApiError::new(
-            "EmptyPassword",
-            RegisterError::EmptyPassword,
-        )));
-    }
-    if user.password.len() < 8 {
-        return Err(ApiResponse::from_error(ApiError::new(
-            "WeakPassword",
-            RegisterError::WeakPassword,
-        )));
-    }
-
-    match db
-        .run(move |conn| {
-            diesel::insert_into(users::table)
-                .values(&User {
-                    id: Uuid::new_v4(),
-                    username: user.username.to_string(),
-                    password: user.password.to_string(),
-                    profile_url: None,
-                    bio: None,
-                    friends: None,
-                })
-                .on_conflict(users::username)
-                .do_nothing()
-                .get_result::<User>(conn)
-        })
-        .await
-    {
-        Ok(user) => {
-            let cookie = Cookie::build(("token", user.id.to_string()))
-                .expires(OffsetDateTime::now_utc().checked_add(Duration::days(1)));
-            jar.add(cookie);
-            Ok(ApiResponse::new(user))
-        }
-        Err(e) => Err(ApiResponse::from_error(e.into())),
-    }
+) -> Result<ApiResponse<PubUser>, ApiResponse> {
+    User::signup(user.into_inner(), db, jar).await
 }
 
 #[post("/login", format = "json", data = "<user>")]
 pub async fn api_login(
     db: Db,
-    user: Json<NewUser>,
+    user: Json<LoginDTO>,
     jar: &CookieJar<'_>,
-) -> Result<ApiResponse<User>, ApiResponse> {
+) -> Result<ApiResponse<PubUser>, ApiResponse> {
     let user = user.into_inner();
-    if user.username.is_empty() {
-        return Err(ApiResponse::from_error(ApiError::new(
-            "EmptyUsername",
-            LoginError::EmptyUsername,
-        )));
-    }
-    if user.password.is_empty() {
-        return Err(ApiResponse::from_error(ApiError::new(
-            "EmptyPassword",
-            LoginError::EmptyPassword,
-        )));
-    }
-
-    match db
-        .run(move |conn| {
-            match users
-                .filter(users::username.eq(user.username))
-                .first::<User>(conn)
-            {
-                Err(_) => Err(ApiError::new("UserNotFound", LoginError::UserNotFound)),
-                Ok(usr) => {
-                    if usr.password != user.password {
-                        Err(ApiError::new("WrongPassword", LoginError::WrongPassword))
-                    } else {
-                        Ok(usr)
-                    }
-                }
-            }
-        })
-        .await
-    {
-        Ok(user) => {
-            let cookie = Cookie::build(("token", user.id.to_string()))
-                .expires(OffsetDateTime::now_utc().checked_add(Duration::days(1)));
-            jar.add(cookie);
-            Ok(ApiResponse::new(user))
-        }
-        Err(e) => Err(ApiResponse::from_error(e.into())),
-    }
+    User::login(user, db, jar).await
 }
 
 #[put("/user", format = "json", data = "<new_user>")]

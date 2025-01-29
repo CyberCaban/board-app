@@ -19,6 +19,7 @@ pub enum ApiErrorType {
     InvalidUserId,
     InvalidRequest,
     AlreadyFriends,
+    EmptyFields,
     Other(String),
 }
 
@@ -39,6 +40,7 @@ impl ToString for ApiErrorType {
             ApiErrorType::InvalidUserId => "Invalid User Id".to_string(),
             ApiErrorType::InvalidRequest => "Invalid Request".to_string(),
             ApiErrorType::AlreadyFriends => "Already Friends".to_string(),
+            ApiErrorType::EmptyFields => "Empty Fields".to_string(),
             ApiErrorType::Other(error) => error.to_string(),
         }
     }
@@ -145,7 +147,7 @@ impl From<ApiError> for DieselError {
 
 #[derive(serde::Serialize)]
 pub enum RegisterError {
-    EmptyUsername,
+    EmptyFields,
     UserAlreadyExists,
     WeakPassword,
     EmptyPassword,
@@ -155,7 +157,7 @@ impl ToString for RegisterError {
         match self {
             RegisterError::UserAlreadyExists => "UserAlreadyExists".to_string(),
             RegisterError::WeakPassword => "WeakPassword".to_string(),
-            RegisterError::EmptyUsername => "EmptyUsername".to_string(),
+            RegisterError::EmptyFields => "EmptyFields".to_string(),
             RegisterError::EmptyPassword => "EmptyPassword".to_string(),
         }
     }

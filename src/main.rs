@@ -10,6 +10,7 @@ mod errors;
 mod models;
 mod routes;
 mod schema;
+mod jwt;
 
 #[macro_use]
 extern crate rocket;
