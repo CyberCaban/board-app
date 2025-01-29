@@ -30,6 +30,15 @@ impl ApiResponse {
     }
 }
 
+impl From<ApiError> for ApiResponse {
+    fn from(error: ApiError) -> Self {
+        ApiResponse {
+            status: error.status(),
+            data: error,
+        }
+    }
+}
+
 impl<T> ApiResponse<T>
 where
     T: serde::Serialize,

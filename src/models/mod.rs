@@ -2,18 +2,12 @@ use diesel::{Insertable, Queryable, QueryableByName, Selectable};
 use rocket::fs::TempFile;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use chrono::{NaiveDateTime, DateTime, Utc};
 
 use crate::schema::column_card;
 pub mod api_response;
 pub mod auth;
 
-#[derive(Serialize, Deserialize)]
-pub struct PubUser {
-    pub id: uuid::Uuid,
-    pub username: String,
-    pub profile_url: Option<String>,
-    pub bio: Option<String>,
-}
 #[derive(Serialize, Deserialize, Queryable, Selectable, Insertable, Debug)]
 #[diesel(table_name = crate::schema::users)]
 pub struct User {
@@ -22,6 +16,26 @@ pub struct User {
     pub password: String,
     pub profile_url: Option<String>,
     pub bio: Option<String>,
+    pub friends: Option<Vec<Option<uuid::Uuid>>>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct PubUser {
+    pub id: uuid::Uuid,
+    pub username: String,
+    pub profile_url: Option<String>,
+    pub bio: Option<String>,
+}
+
+impl From<User> for PubUser {
+    fn from(value: User) -> Self {
+        Self {
+            id: value.id,
+            username: value.username,
+            profile_url: value.profile_url,
+            bio: value.bio,
+        }
+    }
 }
 
 #[derive(Insertable, Queryable, Selectable, Serialize, Deserialize)]
@@ -86,13 +100,6 @@ pub struct BoardColumn {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct SwapCards<'a> {
-    pub card1_id: &'a str,
-    pub card2_id: &'a str,
-    pub card1_position: i32,
-    pub card2_position: i32,
-}
-#[derive(Serialize, Deserialize)]
 pub struct PubCard {
     pub id: uuid::Uuid,
     pub name: String,
@@ -149,6 +156,28 @@ pub struct PubAttachment {
     pub id: uuid::Uuid,
     pub url: String,
 }
+
+#[derive(Insertable, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = crate::schema::friends_requests)]
+pub struct NewFriendRequest {
+    pub sender_id: uuid::Uuid,
+    pub receiver_id: uuid::Uuid,
+}
+
+#[derive(Queryable, Serialize, Deserialize, Selectable, QueryableByName)]
+#[diesel(table_name = crate::schema::friends_requests)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct FriendsRequest {
+    pub id: uuid::Uuid,
+    pub sender_id: uuid::Uuid,
+    pub receiver_id: uuid::Uuid,
+    #[diesel(sql_type = diesel::sql_types::Timestamp)]
+    pub created_at: NaiveDateTime,
+    #[diesel(sql_type = diesel::sql_types::Timestamp)]
+    pub updated_at: NaiveDateTime,
+}
+
+pub type FriendList = Option<Vec<Option<Uuid>>>;
 
 #[macro_export]
 macro_rules! validate_user_token {
