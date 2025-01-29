@@ -167,7 +167,7 @@ pub struct NewFriendRequest {
 #[derive(Queryable, Serialize, Deserialize, Selectable, QueryableByName)]
 #[diesel(table_name = crate::schema::friends_requests)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct FriendsRequests {
+pub struct FriendsRequest {
     pub id: uuid::Uuid,
     pub sender_id: uuid::Uuid,
     pub receiver_id: uuid::Uuid,
@@ -176,6 +176,8 @@ pub struct FriendsRequests {
     #[diesel(sql_type = diesel::sql_types::Timestamp)]
     pub updated_at: NaiveDateTime,
 }
+
+pub type FriendList = Option<Vec<Option<Uuid>>>;
 
 #[macro_export]
 macro_rules! validate_user_token {

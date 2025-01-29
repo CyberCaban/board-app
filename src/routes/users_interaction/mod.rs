@@ -1,6 +1,6 @@
 use diesel::{
-    BoolExpressionMethods, Connection, ExpressionMethods, PgArrayExpressionMethods, QueryDsl,
-    RunQueryDsl, SelectableHelper,
+    BoolExpressionMethods, Connection, ExpressionMethods, PgArrayExpressionMethods, PgConnection,
+    QueryDsl, RunQueryDsl, SelectableHelper,
 };
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -8,9 +8,11 @@ use uuid::Uuid;
 use crate::{
     database::Db,
     errors::{ApiError, ApiErrorType},
-    models::{api_response::ApiResponse, auth::AuthResult, FriendsRequests, NewFriendRequest},
+    models::{api_response::ApiResponse, auth::AuthResult, FriendsRequest, NewFriendRequest},
     schema::{friends_requests, users},
 };
+
+mod helpers;
 
 /// # POST /friends/send/<user>
 /// Sends a friend request
@@ -48,14 +50,7 @@ pub async fn frend_request_send(
                         ApiErrorType::AlreadyFriends,
                     ));
                 }
-                let id = diesel::insert_into(friends_requests::table)
-                    .values(NewFriendRequest {
-                        sender_id: token,
-                        receiver_id: user,
-                    })
-                    .on_conflict_do_nothing()
-                    .returning(friends_requests::id)
-                    .get_result::<Uuid>(conn)?;
+                let id = helpers::add_request_to_db(conn, token, user)?;
                 Ok(id)
             })
         })
@@ -84,22 +79,7 @@ pub async fn frend_request_cancel(
     })?;
     let token = auth.unpack()?.id;
     let tr = db
-        .run(move |conn| {
-            diesel::delete(
-                friends_requests::table
-                    .filter(
-                        friends_requests::sender_id
-                            .eq(token)
-                            .or(friends_requests::receiver_id.eq(token)),
-                    )
-                    .filter(
-                        friends_requests::sender_id
-                            .eq(user_id)
-                            .or(friends_requests::receiver_id.eq(user_id)),
-                    ),
-            )
-            .execute(conn)
-        })
+        .run(move |conn| helpers::delete_request(conn, token, user_id))
         .await;
     match tr {
         Err(e) => Err(ApiResponse::from_error(e.into())),
@@ -132,16 +112,7 @@ pub async fn frend_requests_list(
 ) -> Result<ApiResponse<Value>, ApiResponse> {
     let token = auth.unpack()?.id;
     match db
-        .run(move |conn| {
-            friends_requests::table
-                .filter(
-                    friends_requests::receiver_id
-                        .eq(token)
-                        .or(friends_requests::sender_id.eq(token)),
-                )
-                .select(FriendsRequests::as_select())
-                .load(conn)
-        })
+        .run(move |conn| helpers::load_user_requests(conn, token))
         .await
     {
         Ok(requests) => Ok(ApiResponse::new(json!(requests))),
@@ -167,49 +138,33 @@ pub async fn frend_request_accept(
         .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
     match db
         .run(move |conn| {
-            let FriendsRequests {
-                id,
-                sender_id,
-                receiver_id,
-                ..
-            } = friends_requests::table
-                .filter(
-                    friends_requests::receiver_id
-                        .eq(token)
-                        .or(friends_requests::sender_id.eq(token)),
+            conn.transaction(|conn| {
+                let FriendsRequest {
+                    id,
+                    sender_id,
+                    receiver_id,
+                    ..
+                } = friends_requests::table
+                    .filter(friends_requests::receiver_id.eq(token))
+                    .first::<FriendsRequest>(conn)?;
+                if id != request_id {
+                    return Err(ApiError::from_type(ApiErrorType::InvalidRequest));
+                }
+                diesel::delete(
+                    friends_requests::table.filter(friends_requests::receiver_id.eq(token)),
                 )
-                .first::<FriendsRequests>(conn)?;
-            if id != request_id {
-                return Err(ApiError::from_type(ApiErrorType::InvalidRequest));
-            }
-            diesel::delete(
-                friends_requests::table.filter(
-                    friends_requests::receiver_id
-                        .eq(token)
-                        .or(friends_requests::sender_id.eq(token)),
-                ),
-            )
-            .execute(conn)?;
-            let receiver_friends: Option<Vec<Option<Uuid>>> = users::table
-                .filter(users::id.eq(receiver_id))
-                .select(users::friends)
-                .first(conn)?;
-            let mut receiver_friends = receiver_friends.unwrap_or(vec![]);
-            receiver_friends.push(Some(sender_id));
-            let sender_friends: Option<Vec<Option<Uuid>>> = users::table
-                .filter(users::id.eq(sender_id))
-                .select(users::friends)
-                .first(conn)?;
-            let mut sender_friends = sender_friends.unwrap_or(vec![]);
-            sender_friends.push(Some(receiver_id));
+                .execute(conn)?;
+                let receiver_friends = helpers::get_user_friends(conn, receiver_id)?;
+                let mut receiver_friends = receiver_friends.unwrap_or(vec![]);
+                receiver_friends.push(Some(sender_id));
+                let sender_friends = helpers::get_user_friends(conn, sender_id)?;
+                let mut sender_friends = sender_friends.unwrap_or(vec![]);
+                sender_friends.push(Some(receiver_id));
 
-            diesel::update(users::table.filter(users::id.eq(receiver_id)))
-                .set(users::friends.eq(receiver_friends))
-                .execute(conn)?;
-            diesel::update(users::table.filter(users::id.eq(sender_id)))
-                .set(users::friends.eq(sender_friends))
-                .execute(conn)?;
-            Ok::<(), ApiError>(())
+                helpers::set_user_friends(conn, receiver_id, Some(receiver_friends))?;
+                helpers::set_user_friends(conn, sender_id, Some(sender_friends))?;
+                Ok::<(), ApiError>(())
+            })
         })
         .await
     {
@@ -240,10 +195,9 @@ pub async fn frend_request_decline(
                 friends_requests::table.filter(
                     friends_requests::receiver_id
                         .eq(token)
-                        .or(friends_requests::sender_id.eq(token)),
+                        .and(friends_requests::id.eq(request_id)),
                 ),
             )
-            .filter(friends_requests::id.eq(request_id))
             .execute(conn)
         })
         .await
