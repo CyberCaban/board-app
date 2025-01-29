@@ -8,7 +8,8 @@ use crate::database::Db;
 use crate::errors::{ApiError, ApiErrorType};
 use crate::models::api_response::ApiResponse;
 use crate::models::auth::AuthResult;
-use crate::models::{UploadedFile, User};
+use crate::models::user::User;
+use crate::models::UploadedFile;
 use crate::schema::{files, users};
 
 #[derive(FromForm, Debug)]

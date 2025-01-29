@@ -1,6 +1,6 @@
 use diesel::{
-    BoolExpressionMethods, Connection, ExpressionMethods, PgArrayExpressionMethods, PgConnection,
-    QueryDsl, RunQueryDsl, SelectableHelper,
+    BoolExpressionMethods, Connection, ExpressionMethods, PgArrayExpressionMethods, QueryDsl,
+    RunQueryDsl,
 };
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::{
     database::Db,
     errors::{ApiError, ApiErrorType},
-    models::{api_response::ApiResponse, auth::AuthResult, FriendsRequest, NewFriendRequest},
+    models::{api_response::ApiResponse, auth::AuthResult, FriendsRequest},
     schema::{friends_requests, users},
 };
 
