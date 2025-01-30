@@ -1,4 +1,7 @@
-use diesel::{ExpressionMethods, Insertable, QueryDsl, Queryable, RunQueryDsl, Selectable};
+use chrono::NaiveDateTime;
+use diesel::{
+    ExpressionMethods, Identifiable, Insertable, QueryDsl, Queryable, RunQueryDsl, Selectable,
+};
 use rocket::http::CookieJar;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -9,16 +12,17 @@ use super::api_response::ApiResponse;
 use crate::errors::ApiErrorType::*;
 use bcrypt::{hash, DEFAULT_COST};
 
-#[derive(Serialize, Deserialize, Queryable, Selectable, Insertable, Debug)]
-#[diesel(table_name = crate::schema::users)]
+#[derive(Queryable, Selectable, Identifiable, Insertable, Debug, Clone)]
+#[diesel(table_name = users)]
 pub struct User {
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     pub username: String,
     pub email: String,
     pub password: String,
     pub profile_url: Option<String>,
     pub bio: Option<String>,
-    pub friends: Option<Vec<Option<uuid::Uuid>>>,
+    pub friend_code: Option<String>,
+    pub friend_code_expires_at: Option<NaiveDateTime>,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Clone)]
@@ -93,11 +97,13 @@ impl User {
                         email: user.email,
                         password: user.password,
                         bio: None,
-                        friends: None,
                         profile_url: None,
+                        friend_code: None,
+                        friend_code_expires_at: None,
                     })
                     .get_result::<User>(conn)
             })
+
             .await
         {
             Ok(user) => {

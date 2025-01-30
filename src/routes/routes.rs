@@ -28,7 +28,7 @@ pub async fn api_get_self(db: Db, auth: AuthResult) -> Result<ApiResponse<PubUse
 #[get("/users")]
 pub async fn api_get_users(db: Db) -> Result<ApiResponse<Vec<PubUser>>, ApiResponse> {
     let users = db
-        .run(move |conn| users::table.load::<User>(conn))
+        .run(move |conn| users::table.select(users::all_columns).load::<User>(conn))
         .await
         .map_err(|e| ApiResponse::from_error(e.into()))?;
     Ok(ApiResponse::new(
@@ -37,7 +37,6 @@ pub async fn api_get_users(db: Db) -> Result<ApiResponse<Vec<PubUser>>, ApiRespo
 }
 
 #[get("/user/<user_id>")]
-
 pub async fn api_get_user(db: Db, user_id: String) -> Result<ApiResponse<PubUser>, ApiResponse> {
     let user_id = Uuid::parse_str(&user_id).map_err(|_| {
         ApiResponse::from_error(ApiError::new("InvalidUserId", ApiErrorType::InvalidUserId))

@@ -29,7 +29,12 @@ const nextConfig: NextConfig = {
         source: "/boards/:path*",
         destination: `${api_url}/boards/:path*`,
         basePath: false,
-      }
+      },
+      {
+        source: "/friends/:path*",
+        destination: `${api_url}/friends/:path*`,
+        basePath: false,
+      },
     ];
   },
   images: {

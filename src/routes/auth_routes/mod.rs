@@ -4,14 +4,15 @@ use rocket::serde::json::Json;
 use rocket::time::{Duration, OffsetDateTime};
 use serde_json::{json, Value};
 
-use uuid::Uuid;
-
 use crate::database::Db;
+use crate::jwt;
 use crate::models::api_response::ApiResponse;
 use crate::models::auth::AuthResult;
 use crate::models::user::{LoginDTO, PubUser, SignupDTO, User};
 use crate::schema::users;
+
 #[derive(serde::Serialize, serde::Deserialize)]
+
 pub struct UpdateUser {
     username: String,
     old_password: String,
@@ -44,7 +45,7 @@ pub async fn api_update_user(
     new_user: Json<UpdateUser>,
     jar: &CookieJar<'_>,
     auth: AuthResult,
-) -> Result<ApiResponse<Uuid>, ApiResponse> {
+) -> Result<ApiResponse<PubUser>, ApiResponse> {
     let user_token = auth.unpack()?.id;
     let new_user = new_user.into_inner();
 
@@ -57,16 +58,16 @@ pub async fn api_update_user(
                     users::profile_url.eq(&new_user.profile_url.trim()),
                     users::bio.eq(&new_user.bio.trim()),
                 ))
-                .returning(users::id)
-                .get_result::<Uuid>(conn)
+                .get_result::<User>(conn)
         })
         .await
     {
-        Ok(user_id) => {
-            let cookie = Cookie::build(("token", user_id.to_string()))
+        Ok(user) => {
+            let user_id: PubUser = PubUser::from(user.clone());
+            let cookie = Cookie::build(("token", jwt::Token::generate_token(user_id)))
                 .expires(OffsetDateTime::now_utc().checked_add(Duration::days(1)));
             jar.add(cookie);
-            Ok(ApiResponse::new(user_id))
+            Ok(ApiResponse::new(user.into()))
         }
         Err(e) => Err(ApiResponse::from_error(e.into())),
     }

@@ -1,7 +1,8 @@
 use rocket::{fs::FileServer, Build, Rocket};
 
 use super::{
-    auth_routes, board_routes::*, file_routes, routes, users_interaction, AuthorizationRoutes,
+    auth_routes, board_routes::*, file_routes, friend_routes, routes, users_interaction,
+    AuthorizationRoutes,
 };
 
 impl AuthorizationRoutes for Rocket<Build> {
@@ -25,11 +26,10 @@ impl AuthorizationRoutes for Rocket<Build> {
         .mount(
             "/friends",
             routes![
-                users_interaction::frend_request_send,
-                users_interaction::frend_request_accept,
-                users_interaction::frend_request_decline,
-                users_interaction::frend_requests_list,
-                users_interaction::frend_request_cancel
+                users_interaction::get_friends,
+                friend_routes::generate_friend_code,
+                friend_routes::get_friend_code,
+                friend_routes::redeem_friend_code,
             ],
         )
     }

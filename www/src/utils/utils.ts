@@ -8,7 +8,6 @@ export async function postData(url: string, data: unknown) {
     body: JSON.stringify(data),
   })
     .then((response) => response.json())
-    .catch((err) => console.log(err))
     .then((res) => {
       if (res.error_msg) {
         throw new Error(res.error_msg);
@@ -123,4 +122,11 @@ export function isImage(url: string) {
     url.endsWith(".avif") ||
     url.endsWith(".webp")
   );
+}
+
+export function sanitizeProfileUrl(url: string) {
+  let res = url;
+  if (!res.startsWith("/")) res = `/${res}`;
+  if (res.endsWith("/")) res = res.slice(0, -1);
+  return res;
 }

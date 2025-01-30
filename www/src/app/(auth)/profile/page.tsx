@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { getData, putData } from "@/utils/utils";
+import { getData, putData, sanitizeProfileUrl } from "@/utils/utils";
 import { redirect } from "next/navigation";
 import { useEffect } from "react";
 import { useUnauthorized } from "@/utils/hooks";
@@ -32,11 +32,9 @@ const formSchema = z.object({
 });
 
 export default function Profile() {
-  useUnauthorized();
   const [store] = useUserStore((state) => {
     return state;
   });
-
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -81,7 +79,7 @@ export default function Profile() {
       // new_password: newPassword,
       old_password: "",
       new_password: "",
-      profile_url: profile_url,
+      profile_url: sanitizeProfileUrl(profile_url),
       bio: "",
     })
       .then(() => {
@@ -90,12 +88,12 @@ export default function Profile() {
             store.setUser({
               id: res.id,
               username: res.username,
-              profile_url: res.profile_url,
+              profile_url: sanitizeProfileUrl(res.profile_url),
             });
             console.log(res);
             form.reset({
               username: res.username,
-              profile_url: res.profile_url,
+              profile_url: sanitizeProfileUrl(res.profile_url),
             });
           })
           .catch((err) => {

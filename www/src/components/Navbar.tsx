@@ -32,6 +32,7 @@ export default function Navbar() {
         <Link href="/register">Register</Link>
         <Link href="/login">Login</Link>
         <Link href="/board">Boards</Link>
+        <Link href="/friends">Friends</Link>
       </div>
       <div className="right_pad">{store.id ? <Profile /> : null}</div>
     </nav>
