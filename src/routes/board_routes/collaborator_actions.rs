@@ -1,13 +1,15 @@
-use diesel::{BoolExpressionMethods, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
-use rocket::{http::CookieJar, serde::json::{json, Json}};
-use serde_json::Value;
+use diesel::{result::Error, BoolExpressionMethods, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
+use rocket::serde::json::Json;
 use uuid::Uuid;
 
 use crate::{
-    validate_user_token,
     database::Db,
     errors::{ApiError, ApiErrorType},
-    models::BoardUsersRelation,
+    models::{
+        api_response::ApiResponse,
+        auth::AuthResult,
+        BoardUsersRelation,
+    },
     schema::{board_users_relation, boards},
 };
 
@@ -15,23 +17,24 @@ use crate::{
 /// Adds a collaborator to the board with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
-/// * `cookies` - Takes the token of the user
+/// * `auth` - Takes the token of the user
 /// # Returns
 /// * `collaborator_id` - The id of the collaborator
 #[post("/<board_id>/collaborators", data = "<collaborator_id>")]
 pub async fn boards_add_collaborator(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: String,
     collaborator_id: Json<Uuid>,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<Uuid>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
 
     db.run(move |conn| {
         conn.transaction(|conn| {
             let board_id = Uuid::try_parse(&board_id)
                 .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
 
+            // Check if current user is board member
             let _ = board_users_relation::table
                 .filter(
                     board_users_relation::board_id
@@ -39,6 +42,12 @@ pub async fn boards_add_collaborator(
                         .and(board_users_relation::user_id.eq(token)),
                 )
                 .first::<BoardUsersRelation>(conn)?;
+
+            // Check if current user is board creator
+            let _ = boards::table
+                .filter(boards::id.eq(board_id).and(boards::creator_id.eq(token)))
+                .select(boards::id)
+                .first::<Uuid>(conn)?;
 
             let collaborator = diesel::insert_into(board_users_relation::table)
                 .values(BoardUsersRelation {
@@ -48,28 +57,28 @@ pub async fn boards_add_collaborator(
                 .returning(board_users_relation::user_id)
                 .get_result::<Uuid>(conn)?;
 
-            Ok::<Uuid, diesel::result::Error>(collaborator)
+            Ok::<Uuid, Error>(collaborator)
         })
     })
     .await
-    .map(|collaborator| Json(json!(collaborator)))
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(ApiResponse::new)
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }
 
 /// # GET /boards/<board_id>/collaborators
 /// Returns all the collaborators of the board with the given id
 /// # Arguments
 /// * `board_id` - The id of the board
-/// * `cookies` - Takes the token of the user
+/// * `auth` - Takes the token of the user
 /// # Returns
 /// * `collaborators` - A list of collaborators id's of the board
 #[get("/<board_id>/collaborators")]
 pub async fn boards_get_collaborators(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: String,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<Vec<Uuid>>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
 
     db.run(move |conn| {
         conn.transaction(|conn| {
@@ -89,12 +98,12 @@ pub async fn boards_get_collaborators(
                 .select(board_users_relation::user_id)
                 .load::<Uuid>(conn)?;
 
-            Ok::<Vec<Uuid>, diesel::result::Error>(ids)
+            Ok::<Vec<Uuid>, Error>(ids)
         })
     })
     .await
-    .map(|collaborators| Json(json!(collaborators)))
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(ApiResponse::new)
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }
 
 /// # GET /boards/<board_id>/collaborators/<collaborator_id>
@@ -102,17 +111,17 @@ pub async fn boards_get_collaborators(
 /// # Arguments
 /// * `board_id` - The id of the board
 /// * `collaborator_id` - The id of the collaborator
-/// * `cookies` - Takes the token of the user
+/// * `auth` - Takes the token of the user
 /// # Returns
 /// * `collaborator_id` - The id of the collaborator
 #[get("/<board_id>/collaborators/<collaborator_id>")]
 pub async fn boards_get_collaborator(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: String,
     collaborator_id: String,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<Uuid>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
 
     db.run(move |conn| {
         conn.transaction(|conn| {
@@ -128,19 +137,23 @@ pub async fn boards_get_collaborator(
                 .first::<BoardUsersRelation>(conn)?;
 
             let collaborator = board_users_relation::table
-                .filter(board_users_relation::board_id.eq(board_id).and(
-                    board_users_relation::user_id.eq(Uuid::try_parse(&collaborator_id)
-                        .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?),
-                ))
+                .filter(
+                    board_users_relation::board_id
+                        .eq(board_id)
+                        .and(board_users_relation::user_id.eq(
+                            Uuid::try_parse(&collaborator_id)
+                                .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?,
+                        )),
+                )
                 .select(board_users_relation::user_id)
                 .first::<Uuid>(conn)?;
 
-            Ok::<Uuid, diesel::result::Error>(collaborator)
+            Ok::<Uuid, Error>(collaborator)
         })
     })
     .await
-    .map(|collaborator| Json(json!(collaborator)))
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(ApiResponse::new)
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }
 
 /// # DELETE /boards/<board_id>/collaborators/<collaborator_id>
@@ -148,33 +161,24 @@ pub async fn boards_get_collaborator(
 /// # Arguments
 /// * `board_id` - The id of the board
 /// * `collaborator_id` - The id of the collaborator
-/// * `cookies` - Takes the token of the user
+/// * `auth` - Takes the token of the user
 /// # Returns
 /// * `collaborator_id` - The id of the collaborator
 #[delete("/<board_id>/collaborators/<collaborator_id>")]
 pub async fn boards_remove_collaborator(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: String,
     collaborator_id: String,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<Uuid>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
 
     db.run(move |conn| {
         conn.transaction(|conn| {
             let board_id = Uuid::try_parse(&board_id)
                 .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
 
-            // Check if the user is the member of the board
-            let _ = board_users_relation::table
-                .filter(
-                    board_users_relation::board_id
-                        .eq(board_id)
-                        .and(board_users_relation::user_id.eq(token)),
-                )
-                .first::<BoardUsersRelation>(conn)?;
-
-            // Check if the user is the creator of the board
+            // Check if current user is board creator
             let _ = boards::table
                 .filter(boards::id.eq(board_id).and(boards::creator_id.eq(token)))
                 .select(boards::id)
@@ -183,19 +187,17 @@ pub async fn boards_remove_collaborator(
             let collaborator_id = Uuid::try_parse(&collaborator_id)
                 .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
 
-            // Delete the collaborator
-            diesel::delete(board_users_relation::table)
-                .filter(
-                    board_users_relation::board_id
-                        .eq(board_id)
-                        .and(board_users_relation::user_id.eq(collaborator_id)),
-                )
-                .execute(conn)?;
+            diesel::delete(
+                board_users_relation::table
+                    .filter(board_users_relation::board_id.eq(board_id))
+                    .filter(board_users_relation::user_id.eq(collaborator_id)),
+            )
+            .execute(conn)?;
 
-            Ok::<Uuid, diesel::result::Error>(collaborator_id)
+            Ok::<Uuid, Error>(collaborator_id)
         })
     })
     .await
-    .map(|collaborator_id| Json(json!(collaborator_id)))
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(ApiResponse::new)
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }

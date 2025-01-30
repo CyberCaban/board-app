@@ -1,24 +1,17 @@
-use diesel::{BoolExpressionMethods, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
-use rocket::{
-    http::CookieJar,
-    serde::json::{json, Json},
+use diesel::{
+    result::Error, BoolExpressionMethods, Connection, ExpressionMethods, QueryDsl, RunQueryDsl,
 };
-use serde_json::Value;
+use rocket::serde::json::Json;
 use uuid::Uuid;
 
 use crate::{
     database::Db,
     errors::{ApiError, ApiErrorType},
     models::{
-        Board, BoardInfo, BoardUsersRelation, NewBoard, PubBoard, PubCard, PubColumn, ReturnedCard,
-        ReturnedColumn,
+        api_response::ApiResponse, auth::AuthResult, Board, BoardInfo, BoardUsersRelation,
+        NewBoard, PubBoard, PubCard, PubColumn, ReturnedCard, ReturnedColumn,
     },
-    schema::{
-        board_column, board_users_relation, boards,
-        card_attachments,
-        column_card, files,
-    },
-    validate_user_token,
+    schema::{board_column, board_users_relation, boards, card_attachments, column_card, files},
 };
 
 // TODO: extract complicated functions
@@ -33,10 +26,10 @@ use crate::{
 #[post("/", data = "<board>")]
 pub async fn boards_create_board_and_relation(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board: Json<NewBoard>,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<Uuid>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
 
     db.run(move |conn| {
         conn.transaction(|conn| {
@@ -54,12 +47,12 @@ pub async fn boards_create_board_and_relation(
                     board_id,
                 })
                 .execute(conn)?;
-            Ok::<uuid::Uuid, diesel::result::Error>(board_id)
+            Ok::<Uuid, Error>(board_id)
         })
     })
     .await
-    .map(|id| Json(json!(id)))
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(|id| ApiResponse::new(id))
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }
 
 /// # GET /boards
@@ -80,31 +73,29 @@ pub async fn boards_create_board_and_relation(
 #[get("/")]
 pub async fn boards_get_boards(
     db: Db,
-    cookies: &CookieJar<'_>,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies, db);
+    auth: AuthResult,
+) -> Result<ApiResponse<Vec<PubBoard>>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
 
     db.run(move |conn| {
         let ids = board_users_relation::table
             .filter(board_users_relation::user_id.eq(token))
             .select(board_users_relation::board_id)
             .load::<Uuid>(conn)?;
-        let bds = ids
-            .iter()
-            .map(|id| {
-                boards::table
-                    .filter(boards::id.eq(id))
-                    .select((boards::id, boards::name))
-                    .first::<(Uuid, String)>(conn)
-                    .map(|(id, name)| PubBoard { id, name })
-            })
-            .filter_map(Result::ok)
-            .collect::<Vec<_>>();
-        Ok::<Vec<PubBoard>, diesel::result::Error>(bds)
+
+        let bds = boards::table
+            .filter(boards::id.eq_any(ids))
+            .select((boards::id, boards::name))
+            .load::<(Uuid, String)>(conn)?
+            .into_iter()
+            .map(|(id, name)| PubBoard { id, name })
+            .collect();
+
+        Ok::<Vec<PubBoard>, Error>(bds)
     })
     .await
-    .map(|ids| Json(json!(ids)))
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(ApiResponse::new)
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }
 
 /// # GET /boards/<board_id>
@@ -140,12 +131,12 @@ pub async fn boards_get_boards(
 #[get("/<board_id>")]
 pub async fn boards_get_board(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: &str,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<BoardInfo>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
     let board_id = Uuid::try_parse(board_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
+        .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
 
     db.run(move |conn| {
         let _ = board_users_relation::table
@@ -200,8 +191,8 @@ pub async fn boards_get_board(
         Ok::<BoardInfo, diesel::result::Error>(board)
     })
     .await
-    .map(|board| Json(json!(board)))
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(ApiResponse::new)
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }
 
 /// # PUT /boards/<board_id>
@@ -214,13 +205,13 @@ pub async fn boards_get_board(
 #[put("/<board_id>", data = "<board>")]
 pub async fn boards_update_board(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: &str,
     board: String,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<Uuid>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
     let board_id = Uuid::try_parse(board_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
+        .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
 
     db.run(move |conn| {
         let res = diesel::update(
@@ -232,8 +223,8 @@ pub async fn boards_update_board(
         Ok::<Uuid, diesel::result::Error>(res)
     })
     .await
-    .map(|id| Json(json!(id)))
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(ApiResponse::new)
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }
 
 /// # DELETE /boards/<board_id>
@@ -246,12 +237,12 @@ pub async fn boards_update_board(
 #[delete("/<board_id>")]
 pub async fn boards_delete_board(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: &str,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<Uuid>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
     let board_id = Uuid::try_parse(board_id)
-        .map_err(|_| return ApiError::from_type(ApiErrorType::FailedToParseUUID).to_json())?;
+        .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
 
     db.run(move |conn| {
         let column_ids = board_column::table
@@ -300,6 +291,6 @@ pub async fn boards_delete_board(
         Ok::<Uuid, diesel::result::Error>(id)
     })
     .await
-    .map(|id| Json(json!(id)))
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(ApiResponse::new)
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }

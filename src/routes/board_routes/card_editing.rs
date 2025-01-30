@@ -1,7 +1,5 @@
 use diesel::{BoolExpressionMethods, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
-use rocket::{
-    form::Form, http::CookieJar, serde::json::Json, tokio::io::AsyncReadExt,
-};
+use rocket::{form::Form, tokio::io::AsyncReadExt};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -9,11 +7,10 @@ use crate::{
     database::Db,
     errors::{ApiError, ApiErrorType},
     models::{
-        BoardUsersRelation, PubAttachment, ReturnedCard, UploadAttachment, UploadedFile,
-        SELECT_CARD,
+        api_response::ApiResponse, auth::AuthResult, BoardUsersRelation, PubAttachment,
+        ReturnedCard, UploadAttachment, UploadedFile, SELECT_CARD,
     },
     schema::*,
-    validate_user_token,
 };
 
 /// # GET /boards/<board_id>/cards/<card_id>
@@ -22,7 +19,7 @@ use crate::{
 /// # Arguments
 /// * `board_id` - The id of the board
 /// * `card_id` - The id of the card
-/// * `cookies` - Takes the token of the user
+/// * `auth` - Takes the token of the user
 /// # Returns
 /// * `card` - The card
 /// ```json
@@ -36,11 +33,11 @@ use crate::{
 #[get("/<board_id>/cards/<card_id>")]
 pub async fn boards_get_card_by_id(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: String,
     card_id: String,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<Value>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
 
     db.run(move |conn| {
         conn.transaction(|conn| {
@@ -73,7 +70,7 @@ pub async fn boards_get_card_by_id(
                 })
                 .collect::<Vec<PubAttachment>>();
 
-            Ok::<Json<Value>, diesel::result::Error>(Json(json!({
+            Ok::<Value, diesel::result::Error>(json!({
                 "id": card.0,
                 "name": card.1,
                 "cover_attachment": card.2,
@@ -81,11 +78,12 @@ pub async fn boards_get_card_by_id(
                 "description": card.4,
                 "column_id": card.5,
                 "attachments": attachments
-            })))
+            }))
         })
     })
     .await
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(ApiResponse::new)
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }
 
 /// # POST /boards/<board_id>/cards/<card_id>/attachments
@@ -93,7 +91,7 @@ pub async fn boards_get_card_by_id(
 /// # Arguments
 /// * `board_id` - The id of the board
 /// * `card_id` - The id of the card
-/// * `cookies` - Takes the token of the user
+/// * `auth` - Takes the token of the user
 /// # Returns
 /// * `card` - The card
 /// ```json
@@ -107,12 +105,12 @@ pub async fn boards_get_card_by_id(
 #[post("/<board_id>/cards/<card_id>/attachments", data = "<card>")]
 pub async fn boards_add_attachment_to_card(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: String,
     card_id: String,
     card: Form<UploadAttachment<'_>>,
-) -> Result<Json<Value>, Json<Value>> {
-    let uploader_id = validate_user_token!(cookies);
+) -> Result<ApiResponse<Value>, ApiResponse<ApiError>> {
+    let uploader_id = auth.unpack()?.id;
 
     let filename = card.filename.clone();
     let file_name = format!("{}-{}", Uuid::new_v4(), filename);
@@ -163,14 +161,14 @@ pub async fn boards_add_attachment_to_card(
         })
         .await;
     match transaction {
-        Err(e) => return Err(ApiError::from_error(e).to_json()),
+        Err(e) => Err(ApiResponse::from_error(ApiError::from_error(e))),
         Ok(_) => {
             let mut file = card.file.open().await.unwrap();
             let mut buf = Vec::new();
             file.read_to_end(&mut buf).await.unwrap();
             let file_path = format!("tmp/{}", file_name_clone);
             std::fs::write(&file_path, buf).unwrap();
-            Ok(Json(json!("Attachment added")))
+            Ok(ApiResponse::new(json!("Attachment added")))
         }
     }
 }
@@ -180,7 +178,7 @@ pub async fn boards_add_attachment_to_card(
 /// # Arguments
 /// * `board_id` - The id of the board
 /// * `card_id` - The id of the card
-/// * `cookies` - Takes the token of the user
+/// * `auth` - Takes the token of the user
 /// # Returns
 /// * `attachments` - The attachments
 /// ```json
@@ -196,11 +194,11 @@ pub async fn boards_add_attachment_to_card(
 #[get("/<board_id>/cards/<card_id>/attachments")]
 pub async fn boards_get_attachments_of_card(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: String,
     card_id: String,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<Vec<PubAttachment>>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
 
     db.run(move |conn| {
         conn.transaction(|conn| {
@@ -232,8 +230,8 @@ pub async fn boards_get_attachments_of_card(
         })
     })
     .await
-    .map(|attachments| Json(json!(attachments)))
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(ApiResponse::new)
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }
 
 /// # DELETE /boards/<board_id>/cards/<card_id>/attachments/<attachment_id>
@@ -242,7 +240,7 @@ pub async fn boards_get_attachments_of_card(
 /// * `board_id` - The id of the board
 /// * `card_id` - The id of the card
 /// * `attachment_id` - The id of the attachment
-/// * `cookies` - Takes the token of the user
+/// * `auth` - Takes the token of the user
 /// # Returns
 /// * `card` - The card
 /// ```json
@@ -256,12 +254,12 @@ pub async fn boards_get_attachments_of_card(
 #[delete("/<board_id>/cards/<card_id>/attachments/<attachment_id>")]
 pub async fn boards_delete_attachment_of_card(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: String,
     card_id: String,
     attachment_id: String,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<Value>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
 
     let transaction = db
         .run(move |conn| {
@@ -303,11 +301,11 @@ pub async fn boards_delete_attachment_of_card(
         })
         .await;
     match transaction {
-        Err(e) => return Err(ApiError::from_error(e).to_json()),
+        Err(e) => Err(ApiResponse::from_error(ApiError::from_error(e))),
         Ok(file_name) => {
             std::fs::remove_file(format!("tmp/{}", file_name))
-                .map_err(|e| ApiError::from_error(e).to_json())?;
-            Ok(Json(json!("Attachment deleted")))
+                .map_err(|e| ApiError::from_error(e))?;
+            Ok(ApiResponse::new(json!("Attachment deleted")))
         }
     }
 }

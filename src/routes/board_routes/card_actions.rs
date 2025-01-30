@@ -1,20 +1,17 @@
-use diesel::{BoolExpressionMethods, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
-use rocket::{
-    http::CookieJar,
-    serde::json::{json, Json},
-};
-use serde_json::Value;
+use diesel::{result::Error, BoolExpressionMethods, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
+use rocket::serde::json::Json;
+use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::{
     database::Db,
     errors::{ApiError, ApiErrorType},
     models::{
+        api_response::ApiResponse,
+        auth::AuthResult,
         BoardUsersRelation, CardInfo, ColumnCard, NewCard, PubAttachment, PubCard, ReturnedCard,
-        SELECT_CARD,
     },
     schema::{board_column, board_users_relation, card_attachments, column_card, files},
-    validate_user_token,
 };
 
 /// # POST /boards/<board_id>/columns/<column_id>/cards
@@ -22,7 +19,7 @@ use crate::{
 /// # Arguments
 /// * `board_id` - The id of the board
 /// * `column_id` - The id of the column
-/// * `cookies` - Takes the token of the user
+/// * `auth` - Takes the token of the user
 /// * `card` - The card information
 /// # Returns
 /// * `card` - The card
@@ -37,12 +34,12 @@ use crate::{
 #[post("/<board_id>/columns/<column_id>/cards", data = "<card>")]
 pub async fn boards_create_card(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: String,
     column_id: String,
     card: Json<NewCard>,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<PubCard>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
 
     db.run(move |conn| {
         conn.transaction(|conn| {
@@ -72,24 +69,29 @@ pub async fn boards_create_card(
                     position: card.position,
                     description: card.description.clone(),
                 })
-                .returning(SELECT_CARD)
+                .returning((
+                    column_card::id,
+                    column_card::name,
+                    column_card::cover_attachment,
+                    column_card::position,
+                    column_card::description,
+                    column_card::column_id,
+                ))
                 .get_result::<ReturnedCard>(conn)?;
 
-            Ok::<ReturnedCard, diesel::result::Error>(card)
+            Ok::<PubCard, Error>(PubCard {
+                id: card.0,
+                name: card.1,
+                cover_attachment: card.2,
+                position: card.3,
+                description: card.4,
+                column_id: card.5,
+            })
         })
     })
     .await
-    .map(|card| {
-        Json(json!(PubCard {
-            id: card.0,
-            name: card.1,
-            cover_attachment: card.2,
-            position: card.3,
-            description: card.4,
-            column_id: card.5
-        }))
-    })
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(ApiResponse::new)
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }
 
 /// # GET /boards/<board_id>/columns/<column_id>/cards
@@ -97,7 +99,7 @@ pub async fn boards_create_card(
 /// # Arguments
 /// * `board_id` - The id of the board
 /// * `column_id` - The id of the column
-/// * `cookies` - Takes the token of the user
+/// * `auth` - Takes the token of the user
 /// # Returns
 /// * `cards` - A list of cards in the column
 /// ```json
@@ -113,11 +115,11 @@ pub async fn boards_create_card(
 #[get("/<board_id>/columns/<column_id>/cards")]
 pub async fn boards_get_cards(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: String,
     column_id: String,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<Vec<PubCard>>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
 
     db.run(move |conn| {
         conn.transaction(|conn| {
@@ -141,7 +143,14 @@ pub async fn boards_get_cards(
 
             let cards = column_card::table
                 .filter(column_card::column_id.eq(column))
-                .select(SELECT_CARD)
+                .select((
+                    column_card::id,
+                    column_card::name,
+                    column_card::cover_attachment,
+                    column_card::position,
+                    column_card::description,
+                    column_card::column_id,
+                ))
                 .get_results::<ReturnedCard>(conn)?
                 .into_iter()
                 .map(|card| PubCard {
@@ -152,14 +161,14 @@ pub async fn boards_get_cards(
                     description: card.4,
                     column_id: card.5,
                 })
-                .collect::<Vec<PubCard>>();
+                .collect();
 
-            Ok::<Vec<PubCard>, diesel::result::Error>(cards)
+            Ok::<Vec<PubCard>, Error>(cards)
         })
     })
     .await
-    .map(|cards| Json(json!(cards)))
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(ApiResponse::new)
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }
 
 /// # GET /boards/<board_id>/columns/<column_id>/cards/<card_id>
@@ -168,7 +177,7 @@ pub async fn boards_get_cards(
 /// * `board_id` - The id of the board
 /// * `column_id` - The id of the column
 /// * `card_id` - The id of the card
-/// * `cookies` - Takes the token of the user
+/// * `auth` - Takes the token of the user
 /// # Returns
 /// * `card` - The card
 /// ```json
@@ -182,12 +191,12 @@ pub async fn boards_get_cards(
 #[get("/<board_id>/columns/<column_id>/cards/<card_id>")]
 pub async fn boards_get_card(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: String,
     column_id: String,
     card_id: String,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<Value>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
 
     db.run(move |conn| {
         conn.transaction(|conn| {
@@ -214,7 +223,14 @@ pub async fn boards_get_card(
             let card = column_card::table
                 .filter(column_card::id.eq(card_id))
                 .filter(column_card::column_id.eq(column))
-                .select(SELECT_CARD)
+                .select((
+                    column_card::id,
+                    column_card::name,
+                    column_card::cover_attachment,
+                    column_card::position,
+                    column_card::description,
+                    column_card::column_id,
+                ))
                 .first::<ReturnedCard>(conn)?;
             let attachments = card_attachments::table
                 .filter(card_attachments::card_id.eq(card_id))
@@ -225,7 +241,7 @@ pub async fn boards_get_card(
                 .map(|(id, name)| PubAttachment { id, url: name })
                 .collect::<Vec<PubAttachment>>();
 
-            Ok::<Json<Value>, diesel::result::Error>(Json(json!({
+            Ok::<Value, Error>(json!({
                 "id": card.0,
                 "name": card.1,
                 "cover_attachment": card.2,
@@ -233,11 +249,12 @@ pub async fn boards_get_card(
                 "description": card.4,
                 "column_id": card.5,
                 "attachments": attachments
-            })))
+            }))
         })
     })
     .await
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(|value| ApiResponse::new(value))
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }
 
 /// # PUT /boards/<board_id>/columns/<column_id>/cards/<card_id>
@@ -246,7 +263,7 @@ pub async fn boards_get_card(
 /// * `board_id` - The id of the board
 /// * `column_id` - The id of the column
 /// * `card_id` - The id of the card
-/// * `cookies` - Takes the token of the user
+/// * `auth` - Takes the token of the user
 /// * `card` - The card informatioe
 /// # Returns
 /// * `card` - The card
@@ -261,13 +278,13 @@ pub async fn boards_get_card(
 #[put("/<board_id>/columns/<column_id>/cards/<card_id>", data = "<card>")]
 pub async fn boards_update_card(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: String,
     column_id: String,
     card_id: String,
     card: Json<CardInfo>,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<PubCard>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
 
     db.run(move |conn| {
         conn.transaction(|conn| {
@@ -298,24 +315,29 @@ pub async fn boards_update_card(
                     column_card::name.eq(card.name.clone()),
                     column_card::description.eq(card.description.clone()),
                 ))
-                .returning(SELECT_CARD)
+                .returning((
+                    column_card::id,
+                    column_card::name,
+                    column_card::cover_attachment,
+                    column_card::position,
+                    column_card::description,
+                    column_card::column_id,
+                ))
                 .get_result::<ReturnedCard>(conn)?;
 
-            Ok::<ReturnedCard, diesel::result::Error>(card)
+            Ok::<PubCard, Error>(PubCard {
+                id: card.0,
+                name: card.1,
+                cover_attachment: card.2,
+                position: card.3,
+                description: card.4,
+                column_id: card.5,
+            })
         })
     })
     .await
-    .map(|card| {
-        Json(json!(PubCard {
-            id: card.0,
-            name: card.1,
-            cover_attachment: card.2,
-            position: card.3,
-            description: card.4,
-            column_id: card.5
-        }))
-    })
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(ApiResponse::new)
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }
 
 /// # PUT /boards/<board_id>/columns/<from_column_id>/cards/<card_id>/reorder
@@ -324,7 +346,7 @@ pub async fn boards_update_card(
 /// * `board_id` - The id of the board
 ///  * `from_column_id` - The id of the column
 /// * `card_id` - The id of the card
-/// * `cookies` - Takes the token of the user
+/// * `auth` - Takes the token of the user
 /// # Returns
 /// * `reordered_cards` - The reordered cards
 /// ```json
@@ -341,14 +363,14 @@ pub async fn boards_update_card(
 #[put("/<board_id>/columns/<from_column_id>/cards/<card_id>/reorder/<to_column_id>/<to_pos>")]
 pub async fn boards_reorder_cards(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: String,
     from_column_id: String,
     card_id: String,
     to_column_id: String,
     to_pos: i32,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<Vec<PubCard>>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
 
     db.run(move |conn| {
         conn.transaction(|conn| {
@@ -396,24 +418,29 @@ pub async fn boards_reorder_cards(
                     column_card::column_id.eq(to_column_id),
                     column_card::position.eq(to_pos),
                 ))
-                .returning(SELECT_CARD)
+                .returning((
+                    column_card::id,
+                    column_card::name,
+                    column_card::cover_attachment,
+                    column_card::position,
+                    column_card::description,
+                    column_card::column_id,
+                ))
                 .get_result::<ReturnedCard>(conn)?;
 
-            Ok::<ReturnedCard, diesel::result::Error>(card)
+            Ok::<Vec<PubCard>, Error>(vec![PubCard {
+                id: card.0,
+                name: card.1,
+                cover_attachment: card.2,
+                position: card.3,
+                description: card.4,
+                column_id: card.5,
+            }])
         })
     })
     .await
-    .map(|card| {
-        Json(json!(PubCard {
-            id: card.0,
-            name: card.1,
-            cover_attachment: card.2,
-            position: card.3,
-            description: card.4,
-            column_id: card.5
-        }))
-    })
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(ApiResponse::new)
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }
 
 /// # DELETE /boards/<board_id>/columns/<column_id>/cards/<card_id>
@@ -422,18 +449,18 @@ pub async fn boards_reorder_cards(
 /// * `board_id` - The id of the board
 /// * `column_id` - The id of the column
 /// * `card_id` - The id of the card
-/// * `cookies` - Takes the token of the user
+/// * `auth` - Takes the token of the user
 /// # Returns
 /// * `card_id` - card id
 #[delete("/<board_id>/columns/<column_id>/cards/<card_id>")]
 pub async fn boards_delete_card(
     db: Db,
-    cookies: &CookieJar<'_>,
+    auth: AuthResult,
     board_id: String,
     column_id: String,
     card_id: String,
-) -> Result<Json<Value>, Json<Value>> {
-    let token = validate_user_token!(cookies);
+) -> Result<ApiResponse<Uuid>, ApiResponse<ApiError>> {
+    let token = auth.unpack()?.id;
 
     db.run(move |conn| {
         conn.transaction(|conn| {
@@ -496,10 +523,10 @@ pub async fn boards_delete_card(
                 .returning(column_card::id)
                 .get_result::<Uuid>(conn)?;
 
-            Ok::<Uuid, diesel::result::Error>(card)
+            Ok::<Uuid, Error>(card)
         })
     })
     .await
-    .map(|card| Json(json!(card)))
-    .map_err(|e| ApiError::from_error(e).to_json())
+    .map(|card| ApiResponse::new(card))
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))
 }
