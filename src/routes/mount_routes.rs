@@ -1,6 +1,8 @@
 use rocket::{fs::FileServer, Build, Rocket};
 
-use super::{board_routes::*, file_routes, routes, users_interaction, AuthorizationRoutes};
+use super::{
+    auth_routes, board_routes::*, file_routes, routes, users_interaction, AuthorizationRoutes,
+};
 
 impl AuthorizationRoutes for Rocket<Build> {
     fn mount_auth_routes(self) -> Self {
@@ -12,11 +14,12 @@ impl AuthorizationRoutes for Rocket<Build> {
                 file_routes::api_get_files,
                 routes::api_get_self,
                 routes::api_get_user,
-                routes::api_register,
-                routes::api_login,
-                routes::api_logout,
-                routes::api_update_user,
-                routes::toro
+                routes::api_get_users,
+                routes::toro,
+                auth_routes::api_register,
+                auth_routes::api_login,
+                auth_routes::api_logout,
+                auth_routes::api_update_user,
             ],
         )
         .mount(
