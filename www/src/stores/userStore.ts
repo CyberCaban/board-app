@@ -10,7 +10,7 @@ export type TUser = {
 };
 
 export type UserActions = {
-  register: (username: string, password: string) => void;
+  register: (username: string, email: string, password: string) => void;
   login: (username: string, password: string) => void;
   logout: () => void;
   setUser: (user: TUser) => void;
@@ -37,8 +37,8 @@ export const createUserStore = (user: TUser = defaultUser) => {
       persist(
         devtools((set) => ({
           ...user,
-          register: (username: string, password: string) => {
-            postData("/api/register", { username, password })
+          register: (username: string, email: string, password: string) => {
+            postData("/api/register", { username, email, password })
               .then((res: TUser) => {
                 set({
                   id: res.id,
@@ -49,8 +49,8 @@ export const createUserStore = (user: TUser = defaultUser) => {
               })
               .catch((err) => toast.error(err.message));
           },
-          login: (username: string, password: string) => {
-            postData("/api/login", { username, password })
+          login: (email: string, password: string) => {
+            postData("/api/login", { email, password })
               .then((res: TUser) => {
                 set({
                   id: res.id,
@@ -72,9 +72,9 @@ export const createUserStore = (user: TUser = defaultUser) => {
         })),
         {
           name: "user",
-        }
-      )
-    )
+        },
+      ),
+    ),
   );
 
   store.subscribe(() => {});

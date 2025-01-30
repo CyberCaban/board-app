@@ -17,6 +17,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getData, putData } from "@/utils/utils";
+import { redirect } from "next/navigation";
+import { useEffect } from "react";
+import { useUnauthorized } from "@/utils/hooks";
 
 // TODO: redirect on signin if not signed
 
@@ -29,9 +32,11 @@ const formSchema = z.object({
 });
 
 export default function Profile() {
+  useUnauthorized();
   const [store] = useUserStore((state) => {
     return state;
   });
+
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -103,6 +108,11 @@ export default function Profile() {
       .catch((err) => toast.error(err.message));
   };
 
+  const onLogout = () => {
+    store.logout();
+    redirect("/");
+  };
+
   return (
     <>
       <h1>Profile</h1>
@@ -112,7 +122,7 @@ export default function Profile() {
         width={100}
         height={100}
       />
-      <Button className="mt-4" onClick={() => store.logout()}>
+      <Button className="mt-4" onClick={onLogout}>
         Logout
       </Button>
       <Form {...form}>

@@ -8,6 +8,7 @@ export async function postData(url: string, data: unknown) {
     body: JSON.stringify(data),
   })
     .then((response) => response.json())
+    .catch((err) => console.log(err))
     .then((res) => {
       if (res.error_msg) {
         throw new Error(res.error_msg);
