@@ -16,10 +16,10 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-import UploadAttachment from "./UploadAttachment";
-import DisplayAttachments from "./DisplayAttachments";
 import { deleteData } from "@/utils/utils";
 import { Label } from "@/components/ui/label";
+import DisplayAttachments from "../DisplayAttachments";
+import UploadAttachment from "../UploadAttachment";
 const formSchema = z.object({
   cardName: z.string(),
   cardDescription: z.string(),
