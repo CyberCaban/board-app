@@ -52,13 +52,15 @@ export async function putData(url: string, data: unknown) {
 }
 
 export async function getData(url: string, fetchOptions?: RequestInit) {
-  return fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${getCookie("token")}`,
+  return fetch(
+    url,
+    fetchOptions || {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getCookie("token")}`,
+      },
     },
-    ...fetchOptions,
-  })
+  )
     .then((response) => response.json())
     .then((res) => {
       if (res.error_msg) {

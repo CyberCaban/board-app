@@ -2,14 +2,12 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { IPubUser } from "@/types";
-import { useUnauthorized } from "@/utils/hooks";
 import { getData, postData } from "@/utils/utils";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
 
 export default function FriendCodeSection() {
-  useUnauthorized();
   const [code, setCode] = useState("");
   const [myCode, setMyCode] = useState("");
   const [friends, setFriends] = useState<IPubUser[]>([]);

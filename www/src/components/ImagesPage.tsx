@@ -1,15 +1,18 @@
 "use client";
 import { useEffect, useState } from "react";
-import FileUploadForm from "./FileUploadForm";
 import ImagesMasonry from "./ImagesMasonry";
 import { deleteData, getData } from "@/utils/utils";
 import { IFile } from "@/types";
 import { useUserStore } from "@/providers/userProvider";
 import { toast } from "sonner";
+import Link from "next/link";
+import FileUploadForm from "./forms/FileUploadForm";
 
 export default function ImagesAndUpload() {
   const [imagesURL, setImagesURL] = useState<string[]>([]);
-  const [, store] = useUserStore((state) => state);
+  const [store, internalStore] = useUserStore((state) => state);
+
+  const getId = () => store.id;
 
   const fetchImages = () => {
     getData("/api/files").then((res) => {
@@ -17,19 +20,36 @@ export default function ImagesAndUpload() {
         res.map((file: IFile) => {
           if (file.private) return `/uploads/${file.user_id}/${file.name}`;
           return `/uploads/${file.name}`;
-        })
+        }),
       );
     });
   };
 
+  function UploadComponent() {
+    return (
+      <>
+        {getId() ? (
+          <FileUploadForm refetch={fetchImages} />
+        ) : (
+          <h3>
+            <Link className="underline" href={"/login"}>
+              Sign In
+            </Link>{" "}
+            to upload files
+          </h3>
+        )}
+      </>
+    );
+  }
+
   useEffect(() => {
     fetchImages();
-    const unsubscribe = store.subscribe(() => {
+    const unsubscribe = internalStore.subscribe(() => {
       fetchImages();
     });
 
     return unsubscribe;
-  }, [store]);
+  }, [internalStore]);
 
   const handleDelete = (image: string) => {
     const filename = image.split("/").pop()!;
@@ -43,8 +63,12 @@ export default function ImagesAndUpload() {
 
   return (
     <>
-      <FileUploadForm refetch={fetchImages} />
-      <ImagesMasonry imagesURL={imagesURL} handleDelete={handleDelete} />
+      <UploadComponent />
+      <ImagesMasonry
+        imagesURL={imagesURL}
+        handleDelete={handleDelete}
+        signedIn={!!getId()}
+      />
     </>
   );
 }

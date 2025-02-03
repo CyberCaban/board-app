@@ -17,9 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getData, putData, sanitizeProfileUrl } from "@/utils/utils";
-import { redirect } from "next/navigation";
-import { useEffect } from "react";
-import { useUnauthorized } from "@/utils/hooks";
+import { useRouter } from "next/navigation";
 
 // TODO: redirect on signin if not signed
 
@@ -32,6 +30,7 @@ const formSchema = z.object({
 });
 
 export default function Profile() {
+  const router = useRouter();
   const [store] = useUserStore((state) => {
     return state;
   });
@@ -108,7 +107,7 @@ export default function Profile() {
 
   const onLogout = () => {
     store.logout();
-    redirect("/");
+    router.replace("/");
   };
 
   return (

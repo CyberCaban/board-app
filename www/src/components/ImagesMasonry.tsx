@@ -6,12 +6,34 @@ import Image from "next/image";
 interface MasonryImageProps {
   imagesURL: string[];
   handleDelete: (id: string) => void;
+  signedIn: boolean;
 }
 
 export default function ImagesMasonry({
   imagesURL,
   handleDelete,
+  signedIn,
 }: MasonryImageProps) {
+  function DeleteButton({
+    signedIn,
+    image,
+  }: {
+    signedIn: boolean;
+    image: string;
+  }) {
+    return (
+      <>
+        {signedIn ? (
+          <button
+            className="absolute right-0 top-0 rounded-full px-2 py-0.5 text-red-500 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+            onClick={() => handleDelete(image)}
+          >
+            X
+          </button>
+        ) : null}
+      </>
+    );
+  }
   return (
     <div>
       <h1>Images</h1>
@@ -24,15 +46,15 @@ export default function ImagesMasonry({
                   className="group relative h-auto w-full rounded-md border-2 border-white p-4"
                   key={image}
                 >
-                  <a href={image} target="_blank" rel="noopener noreferrer" download>
+                  <a
+                    href={image}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download
+                  >
                     <h3>{image.split("/").pop()}</h3>
                   </a>
-                  <button
-                    className="absolute right-0 top-0 rounded-full px-2 py-0.5 text-red-500 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-                    onClick={() => handleDelete(image)}
-                  >
-                    X
-                  </button>
+                  <DeleteButton image={image} signedIn={signedIn} />
                 </div>
               );
             }
@@ -53,12 +75,7 @@ export default function ImagesMasonry({
                     className="min-w-full rounded-xl shadow transition-all duration-200 hover:scale-105 group-hover:-translate-y-1"
                   />
                 </a>
-                <button
-                  className="absolute right-0 top-0 rounded-full px-2 py-0.5 text-red-500 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-                  onClick={() => handleDelete(image)}
-                >
-                  X
-                </button>
+                <DeleteButton image={image} signedIn={signedIn} />
               </div>
             );
           })}
