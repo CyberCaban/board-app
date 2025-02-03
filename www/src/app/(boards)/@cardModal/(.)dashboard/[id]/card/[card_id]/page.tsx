@@ -1,4 +1,4 @@
-import EditCard from "@/app/(boards)/_components/EditCard";
+import EditCard from "@/app/(boards)/_components/board_pieces/EditCard";
 import Modal from "@/components/Modal";
 import { use } from "react";
 
