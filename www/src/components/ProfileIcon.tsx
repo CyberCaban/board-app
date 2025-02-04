@@ -8,15 +8,19 @@ export default function Profile() {
   const [state] = useUserStore((state) => state);
 
   return (
-    <Link className="flex flex-row items-center" href="/profile">
-      {/* <Button className="mr-4" onClick={state.logout}>Logout</Button> */}
-      <Image
-        src={state.profile_url || userSVG}
-        alt="Profile"
-        width={50}
-        height={50}
-        className="rounded-full"
-      />
-    </Link>
+    <>
+      {state.id ? (
+        <Link className="flex flex-row items-center" href="/profile">
+          {/* <Button className="mr-4" onClick={state.logout}>Logout</Button> */}
+          <Image
+            src={state.profile_url || userSVG}
+            alt="Profile"
+            width={50}
+            height={50}
+            className="rounded-full"
+          />
+        </Link>
+      ) : null}
+    </>
   );
 }

@@ -8,8 +8,10 @@ use crate::schema::column_card;
 pub mod api_response;
 pub mod auth;
 pub mod user;
+pub mod friends;
 #[derive(Insertable, Queryable, Selectable, Serialize, Deserialize)]
 #[diesel(table_name = crate::schema::files)]
+
 pub struct UploadedFile {
     pub id: uuid::Uuid,
     pub name: String,
@@ -126,28 +128,6 @@ pub struct PubAttachment {
     pub id: uuid::Uuid,
     pub url: String,
 }
-
-#[derive(Insertable, Queryable, Selectable, Serialize, Deserialize)]
-#[diesel(table_name = crate::schema::friends_requests)]
-pub struct NewFriendRequest {
-    pub sender_id: uuid::Uuid,
-    pub receiver_id: uuid::Uuid,
-}
-
-#[derive(Queryable, Serialize, Deserialize, Selectable, QueryableByName)]
-#[diesel(table_name = crate::schema::friends_requests)]
-#[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct FriendsRequest {
-    pub id: uuid::Uuid,
-    pub sender_id: uuid::Uuid,
-    pub receiver_id: uuid::Uuid,
-    #[diesel(sql_type = diesel::sql_types::Timestamp)]
-    pub created_at: NaiveDateTime,
-    #[diesel(sql_type = diesel::sql_types::Timestamp)]
-    pub updated_at: NaiveDateTime,
-}
-
-pub type FriendList = Option<Vec<Option<Uuid>>>;
 
 #[macro_export]
 macro_rules! validate_user_token {

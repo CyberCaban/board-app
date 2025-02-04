@@ -6,13 +6,13 @@ import { Input } from "@/components/ui/input";
 import { useKanbanStore } from "@/providers/kanbanProvider";
 import { toast } from "sonner";
 import Link from "next/link";
-import InteractiveColumns from "../../_components/InteractiveColumns";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
+import InteractiveColumns from "../../_components/board_pieces/InteractiveColumns";
 
 function Error({ message }: { message: string }) {
   return (
@@ -66,6 +66,58 @@ function Board(props: { params: Params }) {
     setIsDanglingColumn(false);
   };
 
+  const handleDeleteBoard = () => {
+    kstore
+      .deleteBoard()
+      .then(() => router.replace("/board"))
+      .catch((e) => toast.error(e.message));
+  };
+
+  function DanglingColumn() {
+    return (
+      <>
+        {isDanglingColumn ? (
+          <div className="min-w-60">
+            <form onSubmit={handleAddColumn}>
+              <Input
+                type="text"
+                className="mt-4"
+                placeholder="Enter column name"
+                onBlur={() => setIsDanglingColumn(false)}
+                ref={columnInputRef}
+              />
+              {/* <Button type="submit" className="mt-4">
+                    Add Column
+                  </Button> */}
+            </form>
+          </div>
+        ) : (
+          <Button
+            className="mt-4 min-w-60"
+            onClick={() => setIsDanglingColumn(true)}
+          >
+            Add Column
+          </Button>
+        )}
+      </>
+    );
+  }
+
+  function Menu() {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="bg-black">
+            ...
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <Button onClick={handleDeleteBoard}>Delete board</Button>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
   return (
     <>
       {error && <Error message={error} />}
@@ -73,52 +125,12 @@ function Board(props: { params: Params }) {
         <>
           <div className="flex flex-row items-center gap-4">
             <h1>{kstore.name}</h1>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="bg-black">
-                  ...
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <Button
-                  onClick={() => {
-                    kstore
-                      .deleteBoard()
-                      .then(() => router.replace("/board"))
-                      .catch((e) => toast.error(e.message));
-                  }}
-                >
-                  Delete board
-                </Button>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Menu />
           </div>
           <p>{kstore.id}</p>
           <ol className="flex h-[calc(100vh-200px)] w-11/12 flex-row items-start gap-4 overflow-x-auto p-2">
             <InteractiveColumns />
-            {isDanglingColumn ? (
-              <div className="min-w-60">
-                <form onSubmit={handleAddColumn}>
-                  <Input
-                    type="text"
-                    className="mt-4"
-                    placeholder="Enter column name"
-                    onBlur={() => setIsDanglingColumn(false)}
-                    ref={columnInputRef}
-                  />
-                  {/* <Button type="submit" className="mt-4">
-                    Add Column
-                  </Button> */}
-                </form>
-              </div>
-            ) : (
-              <Button
-                className="mt-4 min-w-60"
-                onClick={() => setIsDanglingColumn(true)}
-              >
-                Add Column
-              </Button>
-            )}
+            <DanglingColumn />
           </ol>
         </>
       )}

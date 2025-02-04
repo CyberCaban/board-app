@@ -42,3 +42,11 @@ export interface IBoard {
 }
 
 export type ApiError = "Failed to parse UUID" | "Unauthorized";
+
+export interface IPubUser {
+  id: string;
+  username: string;
+  bio: string;
+  profile_url: string;
+}
+

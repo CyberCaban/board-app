@@ -1,10 +1,10 @@
 "use client";
 import { useRef, useState } from "react";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
 import { toast } from "sonner";
 import { postFormData } from "@/utils/utils";
+import { Label } from "../ui/label";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 
 interface IFileUploadFormProps {
   refetch: () => void;

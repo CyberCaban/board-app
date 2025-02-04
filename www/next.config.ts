@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 // const isProd = process.env.NODE_ENV === "production";
-const api_url = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+export const api_url = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
 const nextConfig: NextConfig = {
   redirects: async () => {
@@ -29,7 +29,12 @@ const nextConfig: NextConfig = {
         source: "/boards/:path*",
         destination: `${api_url}/boards/:path*`,
         basePath: false,
-      }
+      },
+      {
+        source: "/friends/:path*",
+        destination: `${api_url}/friends/:path*`,
+        basePath: false,
+      },
     ];
   },
   images: {

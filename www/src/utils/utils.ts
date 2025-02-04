@@ -8,7 +8,6 @@ export async function postData(url: string, data: unknown) {
     body: JSON.stringify(data),
   })
     .then((response) => response.json())
-    .catch((err) => console.log(err))
     .then((res) => {
       if (res.error_msg) {
         throw new Error(res.error_msg);
@@ -53,13 +52,15 @@ export async function putData(url: string, data: unknown) {
 }
 
 export async function getData(url: string, fetchOptions?: RequestInit) {
-  return fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${getCookie("token")}`,
+  return fetch(
+    url,
+    fetchOptions || {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getCookie("token")}`,
+      },
     },
-    ...fetchOptions,
-  })
+  )
     .then((response) => response.json())
     .then((res) => {
       if (res.error_msg) {
@@ -123,4 +124,11 @@ export function isImage(url: string) {
     url.endsWith(".avif") ||
     url.endsWith(".webp")
   );
+}
+
+export function sanitizeProfileUrl(url: string) {
+  let res = url;
+  if (!res.startsWith("/")) res = `/${res}`;
+  if (res.endsWith("/")) res = res.slice(0, -1);
+  return res;
 }

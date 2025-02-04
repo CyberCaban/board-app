@@ -57,12 +57,10 @@ diesel::table! {
 }
 
 diesel::table! {
-    friends_requests (id) {
-        id -> Uuid,
-        sender_id -> Uuid,
-        receiver_id -> Uuid,
+    friends (user_id, friend_id) {
+        user_id -> Uuid,
+        friend_id -> Uuid,
         created_at -> Timestamp,
-        updated_at -> Timestamp,
     }
 }
 
@@ -78,7 +76,9 @@ diesel::table! {
         profile_url -> Nullable<Text>,
         #[max_length = 255]
         bio -> Nullable<Varchar>,
-        friends -> Nullable<Array<Nullable<Uuid>>>,
+        #[max_length = 9]
+        friend_code -> Nullable<Varchar>,
+        friend_code_expires_at -> Nullable<Timestamp>,
     }
 }
 
@@ -97,6 +97,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     card_attachments,
     column_card,
     files,
-    friends_requests,
+    friends,
     users,
 );

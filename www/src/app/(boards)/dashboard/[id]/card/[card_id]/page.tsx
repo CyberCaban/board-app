@@ -1,5 +1,5 @@
 "use client";
-import EditCard from "@/app/(boards)/_components/EditCard";
+import EditCard from "@/app/(boards)/_components/board_pieces/EditCard";
 import { use } from "react";
 
 type Params = Promise<{ id: string; card_id: string }>;
