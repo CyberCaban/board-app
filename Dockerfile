@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y \
 # Install diesel CLI
 RUN cargo install diesel_cli --version "2.1.1" --no-default-features --features postgres
 
+RUN rustup install stable
+RUN rustup default stable
 # Copy the source code
 COPY . .
 

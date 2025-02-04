@@ -38,7 +38,7 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/.env ./
 
 # Install only production dependencies
-RUN npm i --force
+RUN npm i --force --omit=dev
 
 # Create a non-root user
 RUN useradd -m nextjs && chown -R nextjs:nextjs /app
@@ -49,7 +49,7 @@ EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/api/toro || exit 1
+    CMD curl -f http://localhost:3000/api/toro || exit 1
 
 # Start the application
 CMD ["npm", "start"]
