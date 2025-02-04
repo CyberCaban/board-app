@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use rocket::{
-    tokio::{self, select},
+    tokio::{self, select, sync::broadcast::{self, Receiver}},
     State,
 };
 use serde_json::json;
@@ -16,11 +16,15 @@ use crate::{jwt::Token, models::{
 #[get("/events")] // TODO: Rewrite to use ws::Stream
 pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>) -> Channel<'static> {
     use rocket::futures::{SinkExt, StreamExt};
-    let mut is_handshake = true;
+    
+    let ws_state = Arc::clone(ws_state);
+    
     ws.channel(move |stream| {
         Box::pin(async move {
             println!("Connected");
-            let (mut sender, mut receiver) = stream.split();
+            let (mut sink, mut receiver) = stream.split();
+            let mut is_handshake = true;
+            
             tokio::spawn(async move {
                 loop {
                     select! {
@@ -31,14 +35,15 @@ pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>) -> Channel<'s
                                         let user_data = match Token::decode_token(text.to_string()) {
                                             Ok(token) => token.claims.user,
                                             Err(_) => {
-                                                let _ = sender.close().await;
+                                                let _ = sink.close().await;
                                                 break;
                                             }
                                         };
                                         dbg!(&user_data.username);
-
+                                        ws_state.register(&user_data.id, sink.clone()).await;
                                         is_handshake = false;
                                         continue;
+
                                     }
                                     // Handle Text message
                                     println!("Received Text message: {}", text);
@@ -47,7 +52,9 @@ pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>) -> Channel<'s
                                         Err(_) => ChatMessage::default(),
                                     };
                                     let res = m.clone();
-                                    let _ = sender.send(Message::Text(json!(res).to_string())).await;
+                                    let receiver_id = Uuid::parse_str(&m.receiver_id).unwrap();
+                                    let _ = ws_state.send(&receiver_id, WsMessage::Chat(m)).await;
+                                    let _ = sink.send(Message::Text(json!(res).to_string())).await;
                                 }
 
                                     ws::Message::Close(close_frame) => {
@@ -57,7 +64,7 @@ pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>) -> Channel<'s
                                             code: ws::frame::CloseCode::Normal,
                                             reason: "Client disconected".to_string().into(),
                                         };
-                                        let _ = sender.close().await;
+                                        let _ = sink.close().await;
                                         break;
                                     }
 
@@ -72,7 +79,7 @@ pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>) -> Channel<'s
                                     code: ws::frame::CloseCode::Normal,
                                     reason: "Client disconected".to_string().into(),
                                 };
-                                let _ = sender.close().await;
+                                let _ = sink.close().await;
                                 break;
                             }
                     }

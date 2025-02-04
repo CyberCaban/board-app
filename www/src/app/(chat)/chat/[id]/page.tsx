@@ -34,10 +34,11 @@ export default function Chat({ params }: { params: Params }) {
     const onError = (e: Event) => {
       console.log("cloes: ", e);
 
+      // ev?.send(getCookie("token") || "");
       ev?.close();
     };
     es.onmessage = onMessage;
-    es.onerror = onError;
+    es.onclose = onError;
     es.onopen = onOpen;
 
     setEv(es);
