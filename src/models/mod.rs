@@ -2,13 +2,13 @@ use diesel::{Insertable, Queryable, QueryableByName, Selectable};
 use rocket::fs::TempFile;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::NaiveDateTime;
 
 use crate::schema::column_card;
 pub mod api_response;
 pub mod auth;
 pub mod user;
 pub mod friends;
+pub mod ws_state;
 #[derive(Insertable, Queryable, Selectable, Serialize, Deserialize)]
 #[diesel(table_name = crate::schema::files)]
 

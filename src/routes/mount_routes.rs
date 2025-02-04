@@ -1,6 +1,6 @@
 use rocket::{fs::FileServer, tokio::sync::broadcast::channel, Build, Rocket};
 
-use crate::models::friends::ChatMessage;
+use crate::models::{friends::ChatMessage, ws_state::WsState};
 
 use super::{
     auth_routes,
@@ -12,6 +12,7 @@ use super::{
 
 impl AuthorizationRoutes for Rocket<Build> {
     fn mount_auth_routes(self) -> Self {
+        let ws_state = WsState::new();
         self.mount(
             "/api",
             routes![
@@ -38,6 +39,7 @@ impl AuthorizationRoutes for Rocket<Build> {
             ],
         )
         .manage(channel::<ChatMessage>(1024).0)
+        .manage(ws_state)
         .mount("/chat_source", routes![events])
     }
 

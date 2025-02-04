@@ -1,6 +1,6 @@
 "use client";
 import { useUserStore } from "@/providers/userProvider";
-import { postData, postFormData } from "@/utils/utils";
+import { getCookie, postData, postFormData } from "@/utils/utils";
 import { FormEvent, use, useEffect, useState } from "react";
 
 interface Message {
@@ -28,6 +28,7 @@ export default function Chat({ params }: { params: Params }) {
     };
     const onOpen = (e: Event) => {
       console.log("Open: ", e);
+      es.send(getCookie("token") || "");
     };
 
     const onError = (e: Event) => {

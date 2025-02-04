@@ -1,15 +1,22 @@
+use std::sync::Arc;
+
 use rocket::{
-    futures::{SinkExt, StreamExt},
-    tokio::{self, select, sync::broadcast::Sender},
+    tokio::{self, select},
     State,
 };
 use serde_json::json;
+use uuid::Uuid;
 use ws::{Message, *};
 
-use crate::models::friends::ChatMessage;
+use crate::{jwt::Token, models::{
+    friends::ChatMessage,
+    ws_state::{WsMessage, WsState},
+}};
 
-#[get("/events")]
-pub async fn events(ws: WebSocket, queue: &State<Sender<ChatMessage>>) -> Channel<'static> {
+#[get("/events")] // TODO: Rewrite to use ws::Stream
+pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>) -> Channel<'static> {
+    use rocket::futures::{SinkExt, StreamExt};
+    let mut is_handshake = true;
     ws.channel(move |stream| {
         Box::pin(async move {
             println!("Connected");
@@ -20,7 +27,19 @@ pub async fn events(ws: WebSocket, queue: &State<Sender<ChatMessage>>) -> Channe
                         Some(Ok(message)) = receiver.next() => {
                             match message {
                                 ws::Message::Text(text) => {
+                                    if is_handshake {
+                                        let user_data = match Token::decode_token(text.to_string()) {
+                                            Ok(token) => token.claims.user,
+                                            Err(_) => {
+                                                let _ = sender.close().await;
+                                                break;
+                                            }
+                                        };
+                                        dbg!(&user_data.username);
 
+                                        is_handshake = false;
+                                        continue;
+                                    }
                                     // Handle Text message
                                     println!("Received Text message: {}", text);
                                     let m: ChatMessage = match serde_json::from_str(&text) {
