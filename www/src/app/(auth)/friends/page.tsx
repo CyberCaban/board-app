@@ -6,6 +6,7 @@ import { getData, postData } from "@/utils/utils";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function FriendCodeSection() {
   const [code, setCode] = useState("");
@@ -61,22 +62,21 @@ export default function FriendCodeSection() {
         <h3 className="text-lg font-semibold">Friends</h3>
         <div className="flex gap-2">
           {friends.map((friend) => (
-            <div
-              key={friend.id}
-              className="group flex flex-row items-center gap-2 rounded-md p-4 hover:bg-gray-900"
-            >
-              <Image
-                src={friend.profile_url}
-                alt={friend.username}
-                width={100}
-                height={100}
-                className="rounded-full transition-all duration-300 group-hover:scale-110"
-              />
-              <div className="ml-4 flex flex-col gap-2 text-sm transition-all duration-300">
-                <div>{friend.username}</div>
-                <div>{friend.bio}</div>
+            <Link key={friend.id} href={`/chat/${friend.id}`}>
+              <div className="group flex flex-row items-center gap-2 rounded-md p-4 hover:bg-gray-900">
+                <Image
+                  src={friend.profile_url}
+                  alt={friend.username}
+                  width={100}
+                  height={100}
+                  className="rounded-full transition-all duration-300 group-hover:scale-110"
+                />
+                <div className="ml-4 flex flex-col gap-2 text-sm transition-all duration-300">
+                  <div>{friend.username}</div>
+                  <div>{friend.bio}</div>
+                </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

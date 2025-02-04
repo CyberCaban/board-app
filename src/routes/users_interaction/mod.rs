@@ -14,6 +14,7 @@ use crate::{
 };
 
 mod helpers;
+pub mod chat;
 
 /// # GET /friends/list
 /// Returns a list of all the friends of the user

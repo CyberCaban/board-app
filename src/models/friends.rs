@@ -8,7 +8,6 @@ pub struct FriendCode {
     pub expires_at: NaiveDateTime,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FriendRelationship {
     pub user_id: Uuid,
@@ -16,10 +15,10 @@ pub struct FriendRelationship {
     pub created_at: NaiveDateTime,
 }
 
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FriendList {
-    pub friends: Vec<Uuid>,
-    pub pending_incoming: Vec<Uuid>,
-    pub pending_outgoing: Vec<Uuid>,
-} 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ChatMessage {
+    pub content: String,
+    pub sender_id: String,
+    pub receiver_id: String,
+    pub created_at: i64,
+}

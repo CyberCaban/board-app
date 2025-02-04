@@ -1,7 +1,12 @@
-use rocket::{fs::FileServer, Build, Rocket};
+use rocket::{fs::FileServer, tokio::sync::broadcast::channel, Build, Rocket};
+
+use crate::models::friends::ChatMessage;
 
 use super::{
-    auth_routes, board_routes::*, file_routes, friend_routes, routes, users_interaction,
+    auth_routes,
+    board_routes::*,
+    file_routes, friend_routes, routes,
+    users_interaction::{self, chat::events},
     AuthorizationRoutes,
 };
 
@@ -32,6 +37,8 @@ impl AuthorizationRoutes for Rocket<Build> {
                 friend_routes::redeem_friend_code,
             ],
         )
+        .manage(channel::<ChatMessage>(1024).0)
+        .mount("/chat_source", routes![events])
     }
 
     fn mount_board_routes(self) -> Self {
