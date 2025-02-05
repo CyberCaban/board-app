@@ -1,5 +1,4 @@
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
-use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::{
@@ -13,7 +12,6 @@ use crate::{
     schema::{friends, users},
 };
 
-mod helpers;
 pub mod chat;
 
 /// # GET /friends/list

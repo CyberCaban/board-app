@@ -14,11 +14,3 @@ pub struct FriendRelationship {
     pub friend_id: Uuid,
     pub created_at: NaiveDateTime,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ChatMessage {
-    pub content: String,
-    pub sender_id: String,
-    pub receiver_id: String,
-    pub created_at: i64,
-}

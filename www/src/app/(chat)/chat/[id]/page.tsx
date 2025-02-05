@@ -1,68 +1,71 @@
 "use client";
+import ChatMsgs from "@/components/ChatMsgs";
 import { useUserStore } from "@/providers/userProvider";
-import { getCookie, postData, postFormData } from "@/utils/utils";
-import { FormEvent, use, useEffect, useState } from "react";
-
-interface Message {
-  content: string;
-  sender_id: string;
-  receiver_id: string;
-  created_at: number;
-}
+import { IMessage, IPubUser } from "@/types";
+import { getData } from "@/utils/utils";
+import WS from "@/utils/ws";
+import { FormEvent, use, useEffect, useRef, useState } from "react";
 
 type Params = Promise<{ id: string }>;
 
 export default function Chat({ params }: { params: Params }) {
-  const { id } = use(params);
+  const { id: receiver_id } = use(params);
   const [store] = useUserStore((s) => s);
-  const [ev, setEv] = useState<WebSocket>();
-  const [msg, setMsg] = useState<Message[]>([]);
-  const [t, setT] = useState("");
+  const [ws, setWs] = useState<WS>();
+  const [msg, setMsg] = useState<IMessage[]>([]);
+  const [messageInput, setMessageInput] = useState("");
+  const [user, setUser] = useState<IPubUser | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const es = new WebSocket(`http://localhost:3000/chat_source/events`);
-    const onMessage = (e: MessageEvent) => {
-      console.log(e);
-      const m = JSON.parse(e.data);
-      setMsg((prev) => [...prev, m]);
-    };
-    const onOpen = (e: Event) => {
-      console.log("Open: ", e);
-      es.send(getCookie("token") || "");
-    };
+    console.log(msg);
+  }, [msg]);
 
-    const onError = (e: Event) => {
-      console.log("cloes: ", e);
-
-      // ev?.send(getCookie("token") || "");
-      ev?.close();
+  useEffect(() => {
+    const loadMessages = () => {
+      getData("/chat_source/last_messages").then((res) => {
+        setMsg(res.toReversed());
+      });
     };
-    es.onmessage = onMessage;
-    es.onclose = onError;
-    es.onopen = onOpen;
+    loadMessages();
+    getData(`/api/user/${receiver_id}`).then((res) => {
+      setUser(res);
+    });
 
-    setEv(es);
-    return () => {};
+    const ws = new WS("/chat_source/events", (msg: IMessage) => {
+      setMsg((prev) => [...prev, msg]);
+      inputRef.current?.focus();
+      inputRef.current?.scrollIntoView({ behavior: "smooth" });
+    });
+    setWs(ws);
+
+
+    return () => {
+      ws?.close();
+    };
   }, []);
+
   const handleSend = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    ev?.send(
-      JSON.stringify({
-        content: t,
-        sender_id: store.id,
-        receiver_id: id,
-        created_at: Date.now(),
-      }),
-    );
-    setT("");
+    ws?.send({
+      content: messageInput,
+      sender_id: store.id,
+      receiver_id,
+      created_at: Date.now(),
+    });
+    setMessageInput("");
   };
+
   return (
     <div>
-      {msg.map((m) => (
-        <div key={m.created_at}>{m.content}</div>
-      ))}
+      <ChatMsgs msg={msg} user_id={store.id} user={user} />
       <form onSubmit={handleSend}>
-        <input type="text" onChange={(e) => setT(e.target.value)} value={t} />
+        <input
+          ref={inputRef}
+          type="text"
+          onChange={(e) => setMessageInput(e.target.value)}
+          value={messageInput}
+        />
         <button type="submit">send</button>
       </form>
     </div>

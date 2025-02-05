@@ -9,9 +9,10 @@ pub mod auth;
 pub mod user;
 pub mod friends;
 pub mod ws_state;
+pub mod messages;
+
 #[derive(Insertable, Queryable, Selectable, Serialize, Deserialize)]
 #[diesel(table_name = crate::schema::files)]
-
 pub struct UploadedFile {
     pub id: uuid::Uuid,
     pub name: String,

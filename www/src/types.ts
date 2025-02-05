@@ -50,3 +50,9 @@ export interface IPubUser {
   profile_url: string;
 }
 
+export interface IMessage {
+  content: string;
+  sender_id: string;
+  receiver_id: string;
+  created_at: number;
+}

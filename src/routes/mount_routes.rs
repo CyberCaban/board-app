@@ -1,18 +1,17 @@
-use rocket::{fs::FileServer, tokio::sync::broadcast::channel, Build, Rocket};
+use rocket::{fs::FileServer, Build, Rocket};
 
-use crate::models::{friends::ChatMessage, ws_state::WsState};
+use crate::models::ws_state::{self, WsState};
 
 use super::{
     auth_routes,
     board_routes::*,
     file_routes, friend_routes, routes,
-    users_interaction::{self, chat::events},
+    users_interaction::{self, chat::*},
     AuthorizationRoutes,
 };
 
 impl AuthorizationRoutes for Rocket<Build> {
     fn mount_auth_routes(self) -> Self {
-        let ws_state = WsState::new();
         self.mount(
             "/api",
             routes![
@@ -38,9 +37,7 @@ impl AuthorizationRoutes for Rocket<Build> {
                 friend_routes::redeem_friend_code,
             ],
         )
-        .manage(channel::<ChatMessage>(1024).0)
-        .manage(ws_state)
-        .mount("/chat_source", routes![events])
+        .mount("/chat_source", routes![events, last_messages])
     }
 
     fn mount_board_routes(self) -> Self {
@@ -75,8 +72,9 @@ impl AuthorizationRoutes for Rocket<Build> {
         )
     }
 
-    fn mount_static_files(self) -> Self {
-        self.mount("/", FileServer::from("www/dist"))
+    fn manage_state(self) -> Self {
+        let ws_state = WsState::new();
+        self.manage(ws_state)
     }
 
     fn mount_uploads(self) -> Self {

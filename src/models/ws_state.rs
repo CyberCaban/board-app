@@ -11,12 +11,13 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use ws::{stream::DuplexStream, Message};
 
-use super::friends::ChatMessage;
 use rocket::futures::{SinkExt, StreamExt};
+
+use super::messages::ChatMessageDTO;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WsMessage {
-    Chat(ChatMessage),
+    Chat(ChatMessageDTO),
     Close,
 }
 
@@ -57,7 +58,7 @@ impl fmt::Debug for Connection {
 }
 
 pub struct WsState {
-    pub connections: RwLock<HashMap<Uuid, Connection>>,
+    connections: RwLock<HashMap<Uuid, Connection>>,
 }
 
 impl WsState {
@@ -67,10 +68,6 @@ impl WsState {
         });
 
         state
-    }
-
-    pub async fn contains_key(&self, user_id: Uuid) -> bool {
-        self.connections.read().await.contains_key(&user_id)
     }
 
     pub async fn register(&self, user_id: &Uuid, sender: SplitSink<DuplexStream, Message>) {
@@ -88,7 +85,7 @@ impl WsState {
     pub async fn send(&self, user_id: &Uuid, message: WsMessage) -> WsResult<()> {
         dbg!(&self.connections.read().await);
         if let Some(connection) = self.connections.write().await.get_mut(user_id) {
-            connection
+            let _ = connection
                 .sender
                 .send(Message::Text(message.to_string()))
                 .await;
