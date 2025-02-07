@@ -8,41 +8,52 @@ import { useEffect, useRef } from "react";
 function Message({
   msg,
   user_id,
-  user,
+  other_users,
 }: {
   msg: IMessage;
   user_id: string;
-  user: IPubUser | null;
+  other_users: IPubUser[];
 }) {
   const [store] = useUserStore((s) => s);
+  const name =
+    msg.sender_id === store.id
+      ? store.username
+      : other_users.find((u) => u.id === msg.sender_id)?.username || "";
+  function UserProfile() {
+    const imgSrc =
+      msg.sender_id === store.id
+        ? store.profile_url
+        : other_users.find((u) => u.id === msg.sender_id)?.profile_url || "";
+    const alt =
+      msg.sender_id === store.id
+        ? store.username
+        : other_users.find((u) => u.id === msg.sender_id)?.username || "";
+    return (
+      <Image
+        src={imgSrc}
+        alt={alt}
+        width={48}
+        height={48}
+        className="aspect-square h-12 w-12 rounded-full"
+      />
+    );
+  }
   return (
     <div
       className={clsx(
-        "flex flex-col gap-2 rounded-md bg-primary px-4 py-2 text-left",
+        "flex w-full flex-col gap-2 rounded-md bg-primary px-4 py-2 text-left",
         {
           "bg-primary/50": msg.sender_id === store.id,
         },
       )}
     >
-      {user && (
+      {other_users && (
         <section className="flex flex-row justify-between gap-2">
           <section className="flex flex-row gap-2">
-            <Image
-              src={
-                msg.sender_id === store.id
-                  ? store.profile_url
-                  : user.profile_url
-              }
-              alt={msg.sender_id === store.id ? store.username : user.username}
-              width={48}
-              height={48}
-              className="aspect-square h-12 w-12 rounded-full"
-            />
+            <UserProfile />
             <section className="flex flex-col justify-between gap-2">
-              <span className="text-sm text-muted-foreground">
-                {msg.sender_id === user_id ? "You" : user.username}
-              </span>
-              {msg.content}
+              <span className="text-sm text-muted-foreground">{name}</span>
+              <span className="break-all text-sm">{msg.content}</span>
             </section>
           </section>
           <span className="text-sm text-muted-foreground">
@@ -57,11 +68,11 @@ function Message({
 export default function ChatMsgs({
   msg,
   user_id,
-  user,
+  other_users,
 }: {
   msg: IMessage[];
   user_id: string;
-  user: IPubUser | null;
+  other_users: IPubUser[];
 }) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -73,15 +84,16 @@ export default function ChatMsgs({
     }
   }, [msg]);
   return (
-    <section
-      // ref={messagesEndRef}
-      className="m-2 flex max-h-[calc(100vh-12rem)] flex-1 flex-col gap-2 overflow-y-auto rounded-md bg-primary/20"
-    >
+    <section className="m-2 flex max-h-[calc(100vh-12rem)] flex-1 flex-col gap-2 overflow-y-auto rounded-md bg-primary/20">
       {msg.map((m) => (
-        <Message key={m.created_at} msg={m} user_id={user_id} user={user} />
+        <Message
+          key={m.created_at}
+          msg={m}
+          user_id={user_id}
+          other_users={other_users}
+        />
       ))}
       <div ref={messagesEndRef}></div>
     </section>
   );
 }
-

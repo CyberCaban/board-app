@@ -25,7 +25,7 @@ pub struct User {
     pub friend_code_expires_at: Option<NaiveDateTime>,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Eq, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Debug)]
 pub struct PubUser {
     pub id: uuid::Uuid,
     pub username: String,
@@ -103,7 +103,6 @@ impl User {
                     })
                     .get_result::<User>(conn)
             })
-
             .await
         {
             Ok(user) => {

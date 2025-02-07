@@ -3,7 +3,7 @@ import { getCookie } from "./utils";
 class WS {
   private ws: WebSocket;
   private url: string;
-  constructor(url: string, setFn: (msg: any) => void) {
+  constructor(url: string, setFn: (msg: any) => void, conversation_id: string) {
     this.url = url;
     this.ws = new WebSocket(url);
     this.ws.onmessage = (e) => {
@@ -11,7 +11,9 @@ class WS {
       setFn(data);
     };
     this.ws.onopen = () => {
-      this.ws.send(getCookie("token") || "");
+      this.ws.send(
+        JSON.stringify({ token: getCookie("token") || "", conversation_id }),
+      );
       console.log("Connected to server");
     };
     this.ws.onclose = () => {

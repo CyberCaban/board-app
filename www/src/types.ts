@@ -51,8 +51,22 @@ export interface IPubUser {
 }
 
 export interface IMessage {
+  id: string;
   content: string;
   sender_id: string;
-  receiver_id: string;
+  conversation_id: string;
   created_at: number;
+}
+
+export interface IConversation {
+  id: string;
+  member_one: string;
+  member_two: string;
+}
+
+export interface IMember {
+  id: string;
+  bio: string;
+  username: string;
+  profile_url: string;
 }

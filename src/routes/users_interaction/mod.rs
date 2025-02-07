@@ -13,6 +13,8 @@ use crate::{
 };
 
 pub mod chat;
+pub mod conversations;
+mod helpers;
 
 /// # GET /friends/list
 /// Returns a list of all the friends of the user

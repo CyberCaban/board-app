@@ -1,64 +1,80 @@
 "use client";
-import ChatMsgs from "@/components/ChatMsgs";
 import { useUserStore } from "@/providers/userProvider";
-import { IMessage, IPubUser } from "@/types";
-import { getData } from "@/utils/utils";
-import WS from "@/utils/ws";
+import { IConversation, IMember, IMessage } from "@/types";
 import { FormEvent, use, useEffect, useRef, useState } from "react";
+import { findConversation, getLastMessages } from "./conversation";
+import { getCookie } from "@/utils/utils";
+import ChatMsgs from "@/components/ChatMsgs";
 
 type Params = Promise<{ id: string }>;
-
-export default function Chat({ params }: { params: Params }) {
+export default function NewPage({ params }: { params: Params }) {
   const { id: receiver_id } = use(params);
   const [store] = useUserStore((s) => s);
-  const [ws, setWs] = useState<WS>();
-  const [msg, setMsg] = useState<IMessage[]>([]);
-  const [messageInput, setMessageInput] = useState("");
-  const [user, setUser] = useState<IPubUser | null>(null);
+  const [conversation, setConversation] = useState<IConversation | null>(null);
+  const [messages, setMessages] = useState<IMessage[]>([]);
+  const [members, setMembers] = useState<IMember[]>([]);
+  const [ws, setWs] = useState<WebSocket | null>(null);
+  const [messageInput, setMessageInput] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    console.log(msg);
-  }, [msg]);
+    if (store.id) {
+      findConversation(store.id, receiver_id).then((res) => {
+        const [conversation, ...members] = res;
+        setConversation(conversation);
+        setMembers(members);
+      });
+    }
+  }, [store.id, receiver_id]);
 
   useEffect(() => {
-    const loadMessages = () => {
-      getData("/chat_source/last_messages").then((res) => {
-        setMsg(res.toReversed());
-      });
-    };
-    loadMessages();
-    getData(`/api/user/${receiver_id}`).then((res) => {
-      setUser(res);
+    if (!conversation) return;
+    getLastMessages(conversation.id).then((res: IMessage[]) => {
+      setMessages(res.toReversed());
     });
+    const ws: WebSocket = new WebSocket(`/chat_source/events`);
 
-    const ws = new WS("/chat_source/events", (msg: IMessage) => {
-      setMsg((prev) => [...prev, msg]);
-      inputRef.current?.focus();
-      inputRef.current?.scrollIntoView({ behavior: "smooth" });
-    });
+    const handshake = {
+      token: getCookie("token") || "",
+      conversation_id: conversation.id,
+    };
+    ws.onopen = () => {
+      ws.send(JSON.stringify(handshake));
+    };
+    ws.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (data.message) {
+        console.log(data.message);
+      } else setMessages((prev) => [...prev, data]);
+    };
+    ws.onclose = (e) => {
+      console.error("ws closed", e);
+    };
+
     setWs(ws);
-
-
-    return () => {
-      ws?.close();
-    };
-  }, []);
+  }, [conversation]);
 
   const handleSend = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    ws?.send({
-      content: messageInput,
-      sender_id: store.id,
-      receiver_id,
-      created_at: Date.now(),
-    });
+    if (!ws || !messageInput) return;
+    ws.send(
+      JSON.stringify({
+        content: messageInput,
+        sender_id: store.id,
+        conversation_id: conversation?.id,
+        created_at: Date.now(),
+      }),
+    );
     setMessageInput("");
   };
 
   return (
     <div>
-      <ChatMsgs msg={msg} user_id={store.id} user={user} />
+      <ChatMsgs
+        msg={messages}
+        user_id={store.id}
+        other_users={members.filter((m) => m.id !== store.id)}
+      />
       <form onSubmit={handleSend}>
         <input
           ref={inputRef}

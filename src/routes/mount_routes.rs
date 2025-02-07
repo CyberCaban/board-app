@@ -1,12 +1,12 @@
 use rocket::{fs::FileServer, Build, Rocket};
 
-use crate::models::ws_state::{self, WsState};
+use crate::models::ws_state::WsState;
 
 use super::{
     auth_routes,
     board_routes::*,
     file_routes, friend_routes, routes,
-    users_interaction::{self, chat::*},
+    users_interaction::{self, chat::*, conversations::*},
     AuthorizationRoutes,
 };
 
@@ -37,7 +37,10 @@ impl AuthorizationRoutes for Rocket<Build> {
                 friend_routes::redeem_friend_code,
             ],
         )
-        .mount("/chat_source", routes![events, last_messages])
+        .mount(
+            "/chat_source",
+            routes![events, last_messages, get_or_create_conversation],
+        )
     }
 
     fn mount_board_routes(self) -> Self {

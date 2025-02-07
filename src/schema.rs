@@ -37,7 +37,7 @@ diesel::table! {
     chat_messages (id) {
         id -> Uuid,
         sender_id -> Uuid,
-        receiver_id -> Uuid,
+        conversation_id -> Uuid,
         content -> Text,
         file_id -> Nullable<Uuid>,
         deleted -> Bool,
@@ -56,6 +56,14 @@ diesel::table! {
         name -> Varchar,
         #[max_length = 255]
         cover_attachment -> Nullable<Varchar>,
+    }
+}
+
+diesel::table! {
+    conversations (id) {
+        id -> Uuid,
+        member_one -> Uuid,
+        member_two -> Uuid,
     }
 }
 
@@ -100,7 +108,9 @@ diesel::joinable!(board_users_relation -> boards (board_id));
 diesel::joinable!(board_users_relation -> users (user_id));
 diesel::joinable!(boards -> users (creator_id));
 diesel::joinable!(card_attachments -> files (file_id));
+diesel::joinable!(chat_messages -> conversations (conversation_id));
 diesel::joinable!(chat_messages -> files (file_id));
+diesel::joinable!(chat_messages -> users (sender_id));
 diesel::joinable!(column_card -> board_column (column_id));
 diesel::joinable!(files -> users (user_id));
 
@@ -111,6 +121,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     card_attachments,
     chat_messages,
     column_card,
+    conversations,
     files,
     friends,
     users,

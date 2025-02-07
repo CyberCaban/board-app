@@ -1,4 +1,4 @@
-export async function postData(url: string, data: unknown) {
+export async function postData(url: string, data?: unknown) {
   return fetch(`${url}`, {
     method: "POST",
     headers: {

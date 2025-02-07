@@ -1,71 +1,63 @@
 use std::sync::Arc;
 
-use diesel::{prelude::*, BoolExpressionMethods, ExpressionMethods};
+use diesel::RunQueryDsl;
 use rocket::{
+    futures::SinkExt,
     tokio::{self, sync::broadcast},
     State,
 };
+use serde::Deserialize;
 use uuid::Uuid;
 use ws::{Message, *};
 
 use crate::{
     database::Db,
-    errors::ApiError,
+    errors::{ApiError, ApiErrorType},
     jwt::Token,
     models::{
         api_response::ApiResponse,
-        auth::AuthResult,
         messages::{ChatMessageDTO, ClientMessage},
         ws_state::{WsMessage, WsState},
     },
     schema::chat_messages,
 };
 
-async fn get_last_messages(
-    db: Db,
-    auth: Uuid,
-) -> Result<ApiResponse<Vec<ChatMessageDTO>>, ApiResponse<ApiError>> {
-    db.run(move |conn| {
-        chat_messages::table
-            .filter(
-                chat_messages::receiver_id
-                    .eq(auth)
-                    .or(chat_messages::sender_id.eq(auth)),
-            )
-            .order_by(chat_messages::created_at.desc())
-            .limit(100)
-            .load::<ChatMessageDTO>(conn)
-    })
-    .await
-    .map_err(|e| ApiResponse::from_error(e.into()))
-    .map(|messages| ApiResponse::new(messages))
-}
+use super::helpers::get_last_messages;
 
-#[get("/last_messages")]
+#[get("/last_messages/<conversation_id>")]
 pub async fn last_messages(
     db: Db,
-    auth: AuthResult,
+    conversation_id: String,
 ) -> Result<ApiResponse<Vec<ChatMessageDTO>>, ApiResponse<ApiError>> {
-    let auth = auth.unpack()?.id;
-    get_last_messages(db, auth).await
+    let conversation_id = Uuid::parse_str(&conversation_id);
+    if conversation_id.is_err() {
+        return Err(ApiResponse::new(ApiError::from_type(
+            ApiErrorType::FailedToParseUUID,
+        )));
+    }
+    get_last_messages(db, conversation_id.unwrap()).await
+}
+
+#[derive(Deserialize, Default, Debug)]
+struct Handshake {
+    token: String,
+    conversation_id: String,
 }
 
 #[get("/events")]
 pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>, db: Db) -> Channel<'static> {
-    use rocket::futures::{SinkExt, StreamExt};
+    use rocket::futures::StreamExt;
 
     let ws_state = Arc::clone(ws_state);
-    let (tx, rx) = broadcast::channel::<ChatMessageDTO>(16);
+    let (tx, mut rx) = broadcast::channel::<ChatMessageDTO>(16);
     let db = Arc::new(db);
 
     // Spawn DB task
     let db_clone = Arc::clone(&db);
     tokio::spawn(async move {
-        let mut rx = rx;
         while let Ok(message) = rx.recv().await {
             let db = Arc::clone(&db_clone);
             tokio::spawn(async move {
-                dbg!(&message);
                 let _ = db
                     .run(|conn| {
                         diesel::insert_into(chat_messages::table)
@@ -79,18 +71,29 @@ pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>, db: Db) -> Ch
 
     ws.channel(move |stream| {
         Box::pin(async move {
-            let (sink, mut receiver) = stream.split();
+            let (mut sender, mut receiver) = stream.split();
             let mut user_id: Option<Uuid> = None;
 
             // Wait for initial handshake
             while let Some(Ok(message)) = receiver.next().await {
                 if let Message::Text(text) = message {
-                    let user_data = match Token::decode_token(text) {
+                    let handshake: Handshake = serde_json::from_str(&text).unwrap_or_default();
+                    let user_data = match Token::decode_token(handshake.token) {
                         Ok(token) => token.claims.user,
                         Err(_) => return Ok(()),
                     };
+                    let conv_id = Uuid::parse_str(&handshake.conversation_id).unwrap_or_default();
+
                     user_id = Some(user_data.id);
-                    ws_state.register(&user_data.id, sink).await;
+                    let _ = sender
+                        .send(Message::Text(format!(
+                            "{{\"message\": \"Connected to chat: {}\"}}",
+                            conv_id
+                        )))
+                        .await;
+
+                    ws_state.register_member(&user_data.id, sender).await;
+                    ws_state.add_to_conversation(&conv_id, &user_data.id).await;
                     break;
                 }
             }
@@ -101,26 +104,38 @@ pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>, db: Db) -> Ch
                     Message::Text(text) => {
                         let message: ClientMessage =
                             serde_json::from_str(&text).unwrap_or_default();
-                        let receiver_id = Uuid::parse_str(&message.receiver_id).unwrap_or_default();
+                        let conv_id = Uuid::parse_str(&message.conversation_id).unwrap_or_default();
+                        if message.content.is_empty() {
+                            continue;
+                        }
+
+                        dbg!(&message);
+                        if let Some(user_id) = user_id {
+                            if !ws_state.user_in_conversation(&conv_id, &user_id).await {
+                                ws_state.add_to_conversation(&conv_id, &user_id).await;
+                            }
+                        }
 
                         let _ = ws_state
-                            .send(&receiver_id, WsMessage::Chat(message.clone().into()))
+                            .send(&conv_id, WsMessage::Chat(message.clone().into()))
                             .await;
-                        if let Some(user_id) = user_id {
+                        // send message to db
+                        if let Some(_) = user_id {
                             let _ = tx.send(message.clone().into());
-                            let _ = ws_state
-                                .send(&user_id, WsMessage::Chat(message.into()))
-                                .await;
                         }
                     }
 
                     Message::Close(_) => {
+                        dbg!("closing connection");
                         if let Some(user_id) = user_id {
                             let _ = ws_state.unregister(&user_id).await;
                         }
                         break;
                     }
-                    _ => {}
+
+                    _ => {
+                        dbg!("unknown message");
+                    }
                 }
             }
 
