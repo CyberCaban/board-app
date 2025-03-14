@@ -1,4 +1,0 @@
--- Your SQL goes here
-ALTER TABLE users
-ADD profile_url TEXT DEFAULT NULL,
-ADD bio VARCHAR(255) DEFAULT NULL;

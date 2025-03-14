@@ -1,9 +1,5 @@
 -- Your SQL goes here
 
--- Add to your existing users table
-ALTER TABLE users ADD COLUMN friend_code VARCHAR(9) UNIQUE;
-ALTER TABLE users ADD COLUMN friend_code_expires_at TIMESTAMP;
--- Create new tables
 CREATE TABLE friends (
     user_id UUID REFERENCES users(id),
     friend_id UUID REFERENCES users(id),

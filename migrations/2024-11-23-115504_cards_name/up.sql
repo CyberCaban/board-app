@@ -1,7 +1,4 @@
 -- Your SQL goes here
-ALTER TABLE "column_card"
-ADD COLUMN "name" VARCHAR(255) NOT NULL DEFAULT '',
-ADD COLUMN "cover_attachment" VARCHAR(255) DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS "card_attachments" (
     "file_id" UUID NOT NULL,

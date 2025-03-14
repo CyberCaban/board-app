@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS "column_card" (
     "column_id" UUID NOT NULL,
     "description" TEXT,
     "position" INTEGER NOT NULL,
+    "name" VARCHAR(255) NOT NULL DEFAULT '',
+    "cover_attachment" VARCHAR(255) DEFAULT NULL,
     PRIMARY KEY ("id", "column_id"),
     FOREIGN KEY ("column_id") REFERENCES "board_column" ("id")
 )
