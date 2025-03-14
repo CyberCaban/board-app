@@ -7,7 +7,6 @@ import { useEffect, useRef } from "react";
 
 function Message({
   msg,
-  user_id,
   other_users,
 }: {
   msg: IMessage;
@@ -15,19 +14,16 @@ function Message({
   other_users: IPubUser[];
 }) {
   const [store] = useUserStore((s) => s);
+  const other_user = other_users.find((u) => u.id === msg.sender_id);
   const name =
-    msg.sender_id === store.id
-      ? store.username
-      : other_users.find((u) => u.id === msg.sender_id)?.username || "";
+    msg.sender_id === store.id ? store.username : other_user?.username || "";
   function UserProfile() {
     const imgSrc =
       msg.sender_id === store.id
         ? store.profile_url
-        : other_users.find((u) => u.id === msg.sender_id)?.profile_url || "";
+        : other_user?.profile_url || "";
     const alt =
-      msg.sender_id === store.id
-        ? store.username
-        : other_users.find((u) => u.id === msg.sender_id)?.username || "";
+      msg.sender_id === store.id ? store.username : other_user?.username || "";
     return (
       <Image
         src={imgSrc}

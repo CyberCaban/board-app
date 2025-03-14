@@ -72,10 +72,10 @@ pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>, db: Db) -> Ch
     ws.channel(move |stream| {
         Box::pin(async move {
             let (mut sender, mut receiver) = stream.split();
-            let mut user_id: Option<Uuid> = None;
+            let mut user_id = Uuid::nil();
 
             // Wait for initial handshake
-            while let Some(Ok(message)) = receiver.next().await {
+            if let Some(Ok(message)) = receiver.next().await {
                 if let Message::Text(text) = message {
                     let handshake: Handshake = serde_json::from_str(&text).unwrap_or_default();
                     let user_data = match Token::decode_token(handshake.token) {
@@ -84,7 +84,7 @@ pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>, db: Db) -> Ch
                     };
                     let conv_id = Uuid::parse_str(&handshake.conversation_id).unwrap_or_default();
 
-                    user_id = Some(user_data.id);
+                    user_id = user_data.id;
                     let _ = sender
                         .send(Message::Text(format!(
                             "{{\"message\": \"Connected to chat: {}\"}}",
@@ -94,7 +94,6 @@ pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>, db: Db) -> Ch
 
                     ws_state.register_member(&user_data.id, sender).await;
                     ws_state.add_to_conversation(&conv_id, &user_data.id).await;
-                    break;
                 }
             }
 
@@ -110,26 +109,20 @@ pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>, db: Db) -> Ch
                         }
 
                         dbg!(&message);
-                        if let Some(user_id) = user_id {
-                            if !ws_state.user_in_conversation(&conv_id, &user_id).await {
-                                ws_state.add_to_conversation(&conv_id, &user_id).await;
-                            }
+                        if !ws_state.user_in_conversation(&conv_id, &user_id).await {
+                            ws_state.add_to_conversation(&conv_id, &user_id).await;
                         }
 
                         let _ = ws_state
                             .send(&conv_id, WsMessage::Chat(message.clone().into()))
                             .await;
                         // send message to db
-                        if let Some(_) = user_id {
-                            let _ = tx.send(message.clone().into());
-                        }
+                        let _ = tx.send(message.clone().into());
                     }
 
                     Message::Close(_) => {
                         dbg!("closing connection");
-                        if let Some(user_id) = user_id {
-                            let _ = ws_state.unregister(&user_id).await;
-                        }
+                        let _ = ws_state.unregister(&user_id).await;
                         break;
                     }
 
