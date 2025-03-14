@@ -21,12 +21,11 @@
 - File upload
 - File download
 - File deletion
-
-<!-- </br>The frontend is written in React and uses Tailwind CSS for styling.
-</br>The backend is written in Rust and uses Diesel for database operations and Rocket for the web server.
-</br>The project uses PostgreSQL as the database.
-</br>The project uses Docker to build and run the application.
-</br>The project uses HTTP cookies to store the authentication token. -->
+- Realtime chat
+- JWT token authentication
+- Friend system with friend codes
+- Public/private files separation (Anyone can see pulic files but only uploader can see private files)
+- Docker containerization
 
 ## Usage
 
@@ -37,7 +36,7 @@ Prerequisites:
 - [Node.js](https://nodejs.org/en/)
 - [Docker](https://www.docker.com) (optional)
 
-### With Docker 
+### With Docker
 
 ```bash
 docker-compose up
@@ -47,10 +46,9 @@ You can now access the server at http://localhost:3000
 
 ### Without Docker
 
-1. Create .env file with .env.local as example and put your database credentials there.
-It should look like this:
+1. Create .env file with .env.local as example and put your database credentials there. It should look like this:
 
-```
+```env
 PORT=8080 # required
 ROCKET_ADDRESS=0.0.0.0 # required do not use 127.0.0.1
 DATABASE_URL=postgres://username:password@localhost:5432/database_name # required
