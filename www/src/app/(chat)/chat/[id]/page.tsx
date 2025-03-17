@@ -14,7 +14,6 @@ export default function NewPage({ params }: { params: Params }) {
   const [messages, setMessages] = useState<IMessage[]>([]);
   const [members, setMembers] = useState<IMember[]>([]);
   const [ws, setWs] = useState<WebSocket | null>(null);
-  const [messageInput, setMessageInput] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -56,16 +55,16 @@ export default function NewPage({ params }: { params: Params }) {
 
   const handleSend = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!ws || !messageInput) return;
+    if (!ws || !inputRef.current) return;
     ws.send(
       JSON.stringify({
-        content: messageInput,
+        content: inputRef.current.value,
         sender_id: store.id,
         conversation_id: conversation?.id,
         created_at: Date.now(),
       }),
     );
-    setMessageInput("");
+    inputRef.current.value = "";
   };
 
   return (
@@ -76,12 +75,7 @@ export default function NewPage({ params }: { params: Params }) {
         other_users={members.filter((m) => m.id !== store.id)}
       />
       <form onSubmit={handleSend}>
-        <input
-          ref={inputRef}
-          type="text"
-          onChange={(e) => setMessageInput(e.target.value)}
-          value={messageInput}
-        />
+        <input ref={inputRef} type="text" />
         <button type="submit">send</button>
       </form>
     </div>

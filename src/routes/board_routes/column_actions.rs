@@ -1,18 +1,13 @@
 use diesel::{BoolExpressionMethods, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
-use rocket::{
-    http::CookieJar,
-    serde::json::{json, Json},
-};
-use serde_json::Value;
+use rocket::serde::json::Json;
 use uuid::Uuid;
 
 use crate::{
     database::Db,
     errors::{ApiError, ApiErrorType},
     models::{
-        api_response::ApiResponse,
-        auth::AuthResult,
-        BoardColumn, BoardUsersRelation, NewColumn, PubColumn, ReturnedColumn,
+        api_response::ApiResponse, auth::AuthResult, BoardColumn, BoardUsersRelation, NewColumn,
+        PubColumn, ReturnedColumn,
     },
     schema::{board_column, board_users_relation, card_attachments, column_card, files},
 };
@@ -154,9 +149,10 @@ pub async fn boards_get_column(
             .first::<BoardUsersRelation>(conn)?;
 
         let column = board_column::table
-            .filter(board_column::id.eq(Uuid::try_parse(&column_id).map_err(|_| {
-                ApiError::from_type(ApiErrorType::FailedToParseUUID)
-            })?))
+            .filter(
+                board_column::id.eq(Uuid::try_parse(&column_id)
+                    .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?),
+            )
             .select((board_column::id, board_column::name, board_column::position))
             .first::<ReturnedColumn>(conn)?;
 
@@ -208,9 +204,10 @@ pub async fn boards_update_column(
             .first::<BoardUsersRelation>(conn)?;
 
         let column = diesel::update(board_column::table)
-            .filter(board_column::id.eq(Uuid::try_parse(&column_id).map_err(|_| {
-                ApiError::from_type(ApiErrorType::FailedToParseUUID)
-            })?))
+            .filter(
+                board_column::id.eq(Uuid::try_parse(&column_id)
+                    .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?),
+            )
             .set((
                 board_column::name.eq(column.name.clone()),
                 board_column::position.eq(column.position),
