@@ -10,4 +10,5 @@ pub trait AuthorizationRoutes {
     fn mount_board_routes(self) -> Self;
     fn manage_state(self) -> Self;
     fn mount_uploads(self) -> Self;
+    fn mount_metrics(self) -> Self;
 }

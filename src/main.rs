@@ -26,6 +26,7 @@ async fn main() -> Result<(), rocket::Error> {
         .mount_auth_routes()
         .mount_board_routes()
         .manage_state()
+        .mount_metrics()
         .launch()
         .await?;
 

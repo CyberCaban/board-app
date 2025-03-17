@@ -83,4 +83,9 @@ impl AuthorizationRoutes for Rocket<Build> {
     fn mount_uploads(self) -> Self {
         self.mount("/uploads", FileServer::from("tmp").rank(1))
     }
+
+    fn mount_metrics(self) -> Self {
+        let prom = rocket_prometheus::PrometheusMetrics::new();
+        self.attach(prom.clone()).mount("/metrics", prom)
+    }
 }

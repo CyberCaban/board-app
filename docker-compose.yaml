@@ -1,15 +1,33 @@
 version: '3.9'
 
 services:
+  prometheus:
+    build: metrics/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - metrics-data:/prometheus
+
+  grafana:
+    user: "472"
+    image: grafana/grafana
+    volumes:
+      - ./metrics/grafana/provisioning/:/etc/grafana/provisioning/
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    ports:
+      - 3000:3000
+
   frontend:
-    build: 
+    build:
       context: ./www
       args:
         NEXT_PUBLIC_API_BASE_URL: http://web-app:5000
     ports:
-      - "3000:3000"
+      - "8080:3000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/toro"]
+      test: [ "CMD", "curl", "-f", "http://localhost:3000/api/toro" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -32,7 +50,7 @@ services:
       ROCKET_ADDRESS: 0.0.0.0
       RUST_LOG: info
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/toro"]
+      test: [ "CMD", "curl", "-f", "http://localhost:5000/api/toro" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -54,13 +72,13 @@ services:
       POSTGRES_PASSWORD: 123456
       POSTGRES_HOST_AUTH_METHOD: scram-sha-256
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    command: 
+    command:
       - "postgres"
       - "-c"
       - "max_connections=100"
@@ -70,6 +88,8 @@ services:
       - "work_mem=16MB"
 
 volumes:
+  grafana_data: {}
+  metrics-data: {}
   postgres-data:
     driver: local
   tmp:
