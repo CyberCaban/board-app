@@ -28,7 +28,7 @@ services:
       - "8080:3000"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:3000/api/toro" ]
-      interval: 30s
+      interval: 5s
       timeout: 10s
       retries: 3
     develop:
@@ -51,12 +51,13 @@ services:
       RUST_LOG: info
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:5000/api/toro" ]
-      interval: 30s
+      interval: 5s
       timeout: 10s
       retries: 3
     restart: unless-stopped
     volumes:
       - tmp:/app/tmp
+      - ./tmp:/app/tmp
     depends_on:
       postgres-db:
         condition: service_healthy
