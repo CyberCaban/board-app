@@ -7,8 +7,8 @@ use crate::{
     database::Db,
     errors::{ApiError, ApiErrorType},
     models::{
-        api_response::ApiResponse, auth::AuthResult, BoardUsersRelation, PubAttachment,
-        ReturnedCard, UploadAttachment, UploadedFile, SELECT_CARD,
+        api_response::ApiResponse, auth::AuthResult, file::UploadedFile, BoardUsersRelation,
+        PubAttachment, ReturnedCard, UploadAttachment, SELECT_CARD,
     },
     schema::*,
 };

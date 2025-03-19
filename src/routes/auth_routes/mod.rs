@@ -1,25 +1,15 @@
-use diesel::{ExpressionMethods, RunQueryDsl};
 use rocket::http::{Cookie, CookieJar};
 use rocket::serde::json::Json;
 use rocket::time::{Duration, OffsetDateTime};
 use serde_json::{json, Value};
 
+use crate::database::user_queries::{UpdateUser, UserQueries};
 use crate::database::Db;
 use crate::jwt;
 use crate::models::api_response::ApiResponse;
 use crate::models::auth::AuthResult;
 use crate::models::user::{LoginDTO, PubUser, SignupDTO, User};
-use crate::schema::users;
 
-#[derive(serde::Serialize, serde::Deserialize)]
-
-pub struct UpdateUser {
-    username: String,
-    old_password: String,
-    new_password: String,
-    profile_url: String,
-    bio: String,
-}
 #[post("/register", format = "json", data = "<user>")]
 pub async fn api_register(
     db: Db,
@@ -49,19 +39,7 @@ pub async fn api_update_user(
     let user_token = auth.unpack()?.id;
     let new_user = new_user.into_inner();
 
-    match db
-        .run(move |conn| {
-            diesel::update(users::table)
-                .filter(users::id.eq(user_token))
-                .set((
-                    users::username.eq(&new_user.username.trim()),
-                    users::profile_url.eq(&new_user.profile_url.trim()),
-                    users::bio.eq(&new_user.bio.trim()),
-                ))
-                .get_result::<User>(conn)
-        })
-        .await
-    {
+    match UserQueries::update_profile(&db, new_user, user_token).await {
         Ok(user) => {
             let user_id: PubUser = PubUser::from(user.clone());
             let cookie = Cookie::build(("token", jwt::Token::generate_token(user_id)))

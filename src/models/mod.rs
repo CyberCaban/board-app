@@ -6,19 +6,11 @@ use uuid::Uuid;
 use crate::schema::column_card;
 pub mod api_response;
 pub mod auth;
-pub mod user;
+pub mod file;
 pub mod friends;
-pub mod ws_state;
 pub mod messages;
-
-#[derive(Insertable, Queryable, Selectable, Serialize, Deserialize)]
-#[diesel(table_name = crate::schema::files)]
-pub struct UploadedFile {
-    pub id: uuid::Uuid,
-    pub name: String,
-    pub user_id: uuid::Uuid,
-    pub private: bool,
-}
+pub mod user;
+pub mod ws_state;
 
 #[derive(Serialize, Deserialize)]
 pub struct PubBoard {
@@ -128,34 +120,4 @@ pub struct UploadAttachment<'f> {
 pub struct PubAttachment {
     pub id: uuid::Uuid,
     pub url: String,
-}
-
-#[macro_export]
-macro_rules! validate_user_token {
-    ($cookies: ident) => {
-        match $cookies.get("token") {
-            Some(cookie) => match Uuid::parse_str(cookie.value_trimmed()) {
-                Ok(upl_id) => upl_id,
-                Err(_) => return Err(ApiError::from_type(ApiErrorType::InvalidToken).to_json()),
-            },
-            None => return Err(ApiError::from_type(ApiErrorType::Unauthorized).to_json()),
-        }
-    };
-    ($cookies: ident, $db: ident) => {
-        match $cookies.get("token") {
-            None => return Err(ApiError::from_type(ApiErrorType::Unauthorized).to_json()),
-            Some(cookie) => match Uuid::parse_str(cookie.value_trimmed()) {
-                Err(_) => return Err(ApiError::from_type(ApiErrorType::InvalidToken).to_json()),
-                Ok(upl_id) => $db
-                    .run(move |conn| {
-                        crate::schema::users::table
-                            .filter(crate::schema::users::id.eq(upl_id))
-                            .first::<crate::models::user::User>(conn)
-                    })
-                    .await
-                    .map_err(|_| ApiError::from_type(ApiErrorType::InvalidToken).to_json())
-                    .map(|usr| usr.id)?,
-            },
-        }
-    };
 }
