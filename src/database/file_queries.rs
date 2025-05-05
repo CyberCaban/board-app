@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use diesel::{BoolExpressionMethods, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
 use rocket::form::Form;
 use uuid::Uuid;
@@ -16,19 +18,28 @@ impl FileQueries {
         form: &Form<UploadRequest<'_>>,
         uploader_id: Uuid,
     ) -> Result<UploadedFile, diesel::result::Error> {
-        let filename = form.filename.clone();
+        let full_file_name = form.filename.clone();
+        let file_path = Path::new(&full_file_name);
+        let new_name = file_path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or_default();
+        let original_ext = file_path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or_default();
         let file_ext = match form.file.content_type() {
-            None => "",
+            None => original_ext,
             Some(mime) => {
                 let ext = mime.extension();
                 match ext {
-                    None => "",
+                    None => original_ext,
                     Some(ext) => ext.as_str(),
                 }
             }
         };
         let is_private = form.is_private;
-        let file_name = format!("{}-{}.{}", Uuid::new_v4(), filename, file_ext);
+        let file_name = format!("{}-{}.{}", Uuid::new_v4(), new_name, file_ext);
         db.run(move |conn| {
             conn.transaction(|conn| {
                 let _ = users::table

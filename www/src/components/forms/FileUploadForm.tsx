@@ -19,8 +19,7 @@ export default function FileUploadForm({ refetch }: IFileUploadFormProps) {
     if (fileInput.current?.files?.length === 0) return;
     if (!fileInput.current || !fileInput.current.files) return;
     const file = fileInput.current.files?.[0];
-    const nameWithoutExt = file.name.split(".")[0];
-    setFilename(nameWithoutExt);
+    setFilename(file.name);
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
