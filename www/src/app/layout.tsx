@@ -4,12 +4,8 @@ import "./globals.css";
 import { UserStoreProvider } from "@/providers/userProvider";
 import { Toaster } from "sonner";
 import Navbar from "@/components/Navbar";
+import { ThemeProvider } from "next-themes";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
 const geistMono = localFont({
   src: "./fonts/GeistMonoVF.woff",
   variable: "--font-geist-mono",
@@ -17,8 +13,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Board",
-  description: "",
+  title: "Board-app",
+  description: "Beautiful App",
 };
 
 export default function RootLayout({
@@ -28,14 +24,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <UserStoreProvider>
-          <Navbar />
-          {children}
-        </UserStoreProvider>
-        <Toaster />
+      <body className={`${geistMono.variable} ${geistMono.className} bg-background text-foreground`}>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+          <UserStoreProvider>
+            <Navbar />
+            {children}
+          </UserStoreProvider>
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );

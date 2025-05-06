@@ -70,3 +70,10 @@ export interface IMember {
   username: string;
   profile_url: string;
 }
+
+export interface SearchState {
+  query: string;
+  isOpen: boolean;
+  results: number[];
+  currentIndex: number;
+}
