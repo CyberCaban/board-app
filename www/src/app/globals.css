@@ -24,7 +24,7 @@ button {
   transition: border-color 0.25s;
 }
 button:hover {
-  border-color: #646cff;
+  border-color: #989898;
 }
 button:focus,
 button:focus-visible {
@@ -45,11 +45,7 @@ button:focus-visible {
 }
 
 form {
-  @apply flex flex-col gap-2
-}
-
-input, textarea {
-  @apply text-black
+  @apply flex flex-col gap-2;
 }
 
 @layer base {
@@ -115,4 +111,31 @@ input, textarea {
   body {
     @apply bg-foreground text-background;
   }
+}
+.message-bubble {
+  @apply max-w-[80%] rounded-lg p-3;
+}
+
+.message-bubble-sent {
+  @apply ml-auto bg-blue-100 dark:bg-gray-800;
+}
+
+.message-bubble-received {
+  @apply bg-gray-100 dark:bg-gray-700;
+}
+
+.chat-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  @apply bg-gray-100 dark:bg-gray-900;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-gray-300 dark:bg-gray-700;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400 dark:bg-gray-600;
 }

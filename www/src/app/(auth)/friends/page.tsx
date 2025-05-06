@@ -63,7 +63,7 @@ export default function FriendCodeSection() {
         <div className="flex gap-2">
           {friends.map((friend) => (
             <Link key={friend.id} href={`/chat/${friend.id}`}>
-              <div className="group flex flex-row items-center gap-2 rounded-md p-4 hover:bg-gray-900">
+              <div className="group flex flex-row items-center gap-2 rounded-md p-4 hover:bg-primary/20">
                 <Image
                   src={friend.profile_url}
                   alt={friend.username}
