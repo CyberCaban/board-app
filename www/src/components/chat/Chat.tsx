@@ -74,7 +74,6 @@ export default function Chat({ receiver_id }: { receiver_id: string }) {
     });
     ws.current.addEventListener("close", (e) => {
       console.error("ws closed", e);
-      ws.current?.close()
     });
 
     return () => {
