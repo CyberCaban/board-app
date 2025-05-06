@@ -82,6 +82,7 @@ type MemberId = Uuid;
 /// ```
 ///
 
+#[derive(Debug)]
 pub struct WsState {
     connections: RwLock<HashMap<MemberId, Connection>>,
     conversations: RwLock<HashMap<ConversationId, HashSet<MemberId>>>,
@@ -132,7 +133,12 @@ impl WsState {
 
     pub async fn unregister(&self, member_id: &Uuid) -> WsResult<()> {
         let mut connections_guard = self.connections.write().await;
-        connections_guard.remove(member_id);
+        if let Some(mut conn) = connections_guard.remove(member_id) {
+            let res = conn.sender.flush().await;
+            let _ = conn.sender.close().await;
+            dbg!("Closing connection: ", &res);
+        }
+
         let conv_id = {
             let mut user_guard = self.user_conversations.write().await;
             user_guard.remove(member_id)
@@ -146,6 +152,7 @@ impl WsState {
                 }
             }
         }
+        dbg!(&self);
         Ok(())
     }
 

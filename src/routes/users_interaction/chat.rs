@@ -49,25 +49,7 @@ pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>, db: Db) -> Ch
     use rocket::futures::StreamExt;
 
     let ws_state = Arc::clone(ws_state);
-    let (tx, mut rx) = broadcast::channel::<ChatMessageDTO>(16);
     let db = Arc::new(db);
-
-    // Spawn DB task
-    let db_clone = Arc::clone(&db);
-    tokio::spawn(async move {
-        while let Ok(message) = rx.recv().await {
-            let db = Arc::clone(&db_clone);
-            tokio::spawn(async move {
-                let _ = db
-                    .run(|conn| {
-                        diesel::insert_into(chat_messages::table)
-                            .values(message)
-                            .execute(conn)
-                    })
-                    .await;
-            });
-        }
-    });
 
     ws.channel(move |stream| {
         Box::pin(async move {
@@ -94,6 +76,7 @@ pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>, db: Db) -> Ch
 
                     ws_state.register_member(&user_data.id, sender).await;
                     ws_state.add_to_conversation(&conv_id, &user_data.id).await;
+                    dbg!("Succsessful handshake", &ws_state);
                 }
             }
 
@@ -101,6 +84,7 @@ pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>, db: Db) -> Ch
             while let Some(Ok(message)) = receiver.next().await {
                 match message {
                     Message::Text(text) => {
+                        dbg!(&text);
                         let message: ClientMessage =
                             serde_json::from_str(&text).unwrap_or_default();
                         let conv_id = Uuid::parse_str(&message.conversation_id).unwrap_or_default();
@@ -117,17 +101,26 @@ pub async fn events(ws: WebSocket, ws_state: &State<Arc<WsState>>, db: Db) -> Ch
                             .send(&conv_id, WsMessage::Chat(message.clone().into()))
                             .await;
                         // send message to db
-                        let _ = tx.send(message.clone().into());
+                        let db_clone = Arc::clone(&db);
+                        let _ = db_clone
+                            .run(move |conn| {
+                                diesel::insert_into(chat_messages::table)
+                                    .values::<ChatMessageDTO>(message.clone().into())
+                                    .execute(conn)
+                            })
+                            .await;
                     }
 
                     Message::Close(_) => {
                         dbg!("closing connection");
                         let _ = ws_state.unregister(&user_id).await;
+                        dbg!("closing connection stop");
                         break;
                     }
 
                     _ => {
                         dbg!("unknown message");
+                        break;
                     }
                 }
             }
