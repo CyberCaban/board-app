@@ -30,19 +30,15 @@ RUN apt-get update && apt-get install -y curl && \
 
 ENV NODE_ENV=production
 
-# Copy necessary files from builder
-COPY --from=builder /app/next.config.ts ./
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/.env ./
-
-# Install only production dependencies
-RUN npm i --force --omit=dev
-
 # Create a non-root user
-RUN useradd -m nextjs && chown -R nextjs:nextjs /app
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs 
 USER nextjs
+
+# Copy necessary files from builder
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # Expose port
 EXPOSE 3000
@@ -52,4 +48,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:3000/api/toro || exit 1
 
 # Start the application
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

@@ -5,6 +5,7 @@ export const api_url =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   redirects: async () => {
     return [
       {
