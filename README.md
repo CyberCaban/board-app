@@ -1,3 +1,4 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/CyberCaban/board-app)
 <p align="center">
     <h1 align="center">Web App</h1>
     <p align="center">
