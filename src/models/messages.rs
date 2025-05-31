@@ -54,6 +54,7 @@ pub struct ClientMessage {
     pub sender_id: String,
     pub conversation_id: String,
     pub created_at: i64,
+    pub file_id: Option<Uuid>,
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug, Queryable, QueryableByName, Selectable)]

@@ -16,6 +16,8 @@ export default function Chat({ receiver_id }: { receiver_id: string }) {
   const [store] = useUserStore((s) => s);
   const [messages, setMessages] = useState<IMessage[]>([]);
 
+  const [, setFileId] = useState("")
+
   const [isUploadOpen, setIsUploadOpen] = useState(false);
 
   const [searchState, setSearchState] = useState<SearchState>({
@@ -89,11 +91,14 @@ export default function Chat({ receiver_id }: { receiver_id: string }) {
       sender_id: store.id,
       conversation_id: conversation?.id,
       created_at: Date.now(),
+      file_id: null
     };
     ws.current?.send(JSON.stringify(msg));
   };
 
-  const handleUpload = () => {};
+  const handleUpload = (fileName: string) => {
+    setFileId(fileName)
+  };
   const handleSearch = useCallback(() => {
     const { query } = searchState;
     if (!query.trim()) {

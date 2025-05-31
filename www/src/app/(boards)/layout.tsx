@@ -1,4 +1,4 @@
-"use client";
+import AuthGuardRedirect from "@/components/authGuards/AuthGuardRedirect";
 import { KanbanStoreProvider } from "@/providers/kanbanProvider";
 
 export default function BoardsLayout({
@@ -9,11 +9,13 @@ export default function BoardsLayout({
   cardModal: React.ReactNode;
 }) {
   return (
-    <main className="flex flex-col px-6">
-      <KanbanStoreProvider>
-        {cardModal}
-        {children}
-      </KanbanStoreProvider>
-    </main>
+    <AuthGuardRedirect>
+      <main className="flex flex-col px-6">
+        <KanbanStoreProvider>
+          {cardModal}
+          {children}
+        </KanbanStoreProvider>
+      </main>
+    </AuthGuardRedirect>
   );
 }

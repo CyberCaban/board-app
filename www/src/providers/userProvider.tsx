@@ -1,13 +1,14 @@
 "use client";
 
 import { createUserStore, initUserStore, UserStore } from "@/stores/userStore";
-import { createContext, useContext, useRef } from "react";
+import { getData } from "@/utils/utils";
+import { createContext, useContext, useEffect, useRef } from "react";
 import { useStore } from "zustand";
 
 export type UserStoreApi = ReturnType<typeof createUserStore>;
 
 export const UserStoreContext = createContext<UserStoreApi | undefined>(
-  undefined
+  undefined,
 );
 
 export function UserStoreProvider({ children }: { children: React.ReactNode }) {
@@ -16,6 +17,8 @@ export function UserStoreProvider({ children }: { children: React.ReactNode }) {
   if (!storeRef.current) {
     storeRef.current = createUserStore(initUserStore());
   }
+  // reset user if not authorized
+  getData("/api/user").catch(() => storeRef.current?.getState().resetUser());
 
   return (
     <UserStoreContext.Provider value={storeRef.current}>
@@ -25,13 +28,17 @@ export function UserStoreProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const useUserStore = <T,>(
-  selector: (store: UserStore) => T
+  selector: (store: UserStore) => T,
 ): [T, UserStoreApi] => {
   const store = useContext(UserStoreContext);
 
   if (!store) {
     throw new Error("useUserStore must be used within a UserStoreProvider");
   }
+  // reset user if not authorized
+  useEffect(() => {
+    getData("/api/user").catch(() => store?.getState().resetUser());
+  }, []);
 
   return [useStore(store, selector), store];
 };

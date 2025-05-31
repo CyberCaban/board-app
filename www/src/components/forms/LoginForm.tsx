@@ -1,6 +1,9 @@
 "use client";
 import { useState } from "react";
 import { useUserStore } from "@/providers/userProvider";
+import { Input } from "../ui/input";
+import { Button } from "../ui/button";
+import { Label } from "../ui/label";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
@@ -15,8 +18,8 @@ export default function LoginForm() {
   return (
     <form onSubmit={login}>
       <h1>Login</h1>
-      <label htmlFor="loginEmail">Email</label>
-      <input
+      <Label htmlFor="loginEmail">Email</Label>
+      <Input
         type="text"
         name="loginEmail"
         id="loginEmail"
@@ -24,8 +27,8 @@ export default function LoginForm() {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
       />
-      <label htmlFor="loginPassword">Password</label>
-      <input
+      <Label htmlFor="loginPassword">Password</Label>
+      <Input
         type="password"
         name="loginPassword"
         id="loginPassword"
@@ -33,7 +36,7 @@ export default function LoginForm() {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
       />
-      <button type="submit">Login</button>
+      <Button type="submit">Login</Button>
     </form>
   );
 }

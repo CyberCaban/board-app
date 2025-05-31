@@ -29,7 +29,16 @@ export default function ImagesAndUpload() {
     return (
       <>
         {getId() ? (
-          <FileUploadForm refetch={fetchImages} />
+          <FileUploadForm
+            onSuccess={() => {
+              fetchImages();
+              toast.success("File uploaded successfully!");
+            }}
+            onFailure={(error) => {
+              toast.error(`Error uploading file: ${error}`);
+              console.error(error);
+            }}
+          />
         ) : (
           <h3>
             <Link className="underline" href={"/login"}>

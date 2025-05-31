@@ -1,7 +1,7 @@
 "use client";
 import { isImage } from "@/utils/utils";
 import Image from "next/image";
-// import Link from "next/link";
+import { X } from "lucide-react";
 
 interface MasonryImageProps {
   imagesURL: string[];
@@ -25,10 +25,10 @@ export default function ImagesMasonry({
       <>
         {signedIn ? (
           <button
-            className="absolute right-0 top-0 rounded-full px-2 py-0.5 text-red-500 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+            className="absolute right-0 top-0 rounded-full p-0.5 text-red-500 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
             onClick={() => handleDelete(image)}
           >
-            X
+            <X className="h-4 w-4" />
           </button>
         ) : null}
       </>
@@ -43,7 +43,7 @@ export default function ImagesMasonry({
             if (!isImage(image)) {
               return (
                 <div
-                  className="group relative h-auto w-full rounded-md border-2 border-white p-4"
+                  className="group relative h-auto w-full break-inside-avoid-column rounded-md border-2 border-foreground p-4"
                   key={image}
                 >
                   <a

@@ -1,7 +1,5 @@
 "use client";
 import { useUserStore } from "@/providers/userProvider";
-import Image from "next/image";
-import userSVG from "../../../../public/user.svg";
 import { Input } from "@/components/ui/input";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -18,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getData, putData, sanitizeProfileUrl } from "@/utils/utils";
 import { useRouter } from "next/navigation";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // TODO: redirect on signin if not signed
 
@@ -113,12 +112,10 @@ export default function Profile() {
   return (
     <>
       <h1>Profile</h1>
-      <Image
-        src={store.profile_url || userSVG}
-        alt="Profile Image"
-        width={100}
-        height={100}
-      />
+      <Avatar className="w-[100px] h-[100px]">
+        <AvatarImage width={100} height={100} src={store.profile_url}/>
+        <AvatarFallback>{store.username[0]}</AvatarFallback>
+      </Avatar>
       <Button className="mt-4" onClick={onLogout}>
         Logout
       </Button>

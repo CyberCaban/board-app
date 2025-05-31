@@ -44,7 +44,7 @@ export function MessageInput({
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Введите сообщение..."
+          placeholder="Enter message"
           className="flex-1 border-gray-300 bg-background text-foreground focus:border-gray-400 dark:border-gray-700 dark:focus:border-gray-600"
         />
         <Button
@@ -53,7 +53,6 @@ export function MessageInput({
           disabled={!newMessage.trim()}
         >
           <Send className="h-4 w-4" />
-          <span className="ml-2">send</span>
         </Button>
       </div>
     </div>

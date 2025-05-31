@@ -1,90 +1,87 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useRef, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useRef, useState } from "react";
+import { sentFileToBackend } from "@/lib/queries";
+import { Input } from "../ui/input";
+import { Button } from "../ui/button";
+import { MAX_FILE_SIZE } from "@/lib/constants";
+import { toast } from "sonner";
 
 interface FileUploadDialogProps {
-  isOpen: boolean
-  onOpenChange: (open: boolean) => void
-  onUpload: (file: File, fileName: string, isPrivate: boolean) => void
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onUpload: (fileName: string) => void;
 }
 
-export function FileUploadDialog({ isOpen, onOpenChange, onUpload }: FileUploadDialogProps) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [fileName, setFileName] = useState("")
-  const [isPrivate, setIsPrivate] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+export function FileUploadDialog({
+  isOpen,
+  onOpenChange,
+  onUpload,
+}: FileUploadDialogProps) {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [filename, setFilename] = useState<string>("");
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      setSelectedFile(file)
-      setFileName(file.name)
+  const handleFileChange = () => {
+    if (fileInput.current?.files?.length === 0) return;
+    if (!fileInput.current || !fileInput.current.files) return;
+    const file = fileInput.current.files?.[0];
+    setFilename(file.name);
+  };
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!fileInput.current || !fileInput.current?.files?.length) return;
+    const file = fileInput.current.files?.[0];
+    console.log(file);
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("Maximum file size exceeded");
+      return;
     }
-  }
 
-  const handleUpload = () => {
-    if (!selectedFile) return
+    sentFileToBackend(
+      file,
+      filename,
+      true,
+      (refName) => {
+        setFilename("");
+        if (fileInput.current) fileInput.current.value = "";
 
-    onUpload(selectedFile, fileName, isPrivate)
-
-    // Сброс состояния
-    setSelectedFile(null)
-    setFileName("")
-    setIsPrivate(false)
-    onOpenChange(false)
-  }
+        onUpload(refName);
+      },
+      (error) => {
+        console.error(error);
+      },
+    );
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-background text-foreground border-border">
+      <DialogContent className="border-border bg-background text-foreground">
         <DialogHeader>
-          <DialogTitle>Upload File</DialogTitle>
+          <VisuallyHidden.Root>
+            <DialogTitle>Upload File</DialogTitle>
+          </VisuallyHidden.Root>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="flex flex-col space-y-2">
-            <Button
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              className="bg-secondary hover:bg-secondary/80 border-border"
-            >
-              Browse...
-              {selectedFile ? ` ${selectedFile.name}` : " No file selected."}
-            </Button>
-            <input ref={fileInputRef} type="file" onChange={handleFileSelect} className="hidden" accept="image/*" />
-          </div>
-
-          <div className="flex flex-col space-y-2">
-            <Label htmlFor="filename">Filename</Label>
-            <Input
-              id="filename"
-              value={fileName}
-              onChange={(e) => setFileName(e.target.value)}
-              className="bg-background border-input"
-            />
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="private"
-              checked={isPrivate}
-              onCheckedChange={(checked) => setIsPrivate(checked as boolean)}
-            />
-            <Label htmlFor="private">Private</Label>
-          </div>
-
-          <Button onClick={handleUpload} disabled={!selectedFile} className="w-full">
-            Upload File
-          </Button>
-        </div>
+        <form className="upload-form" onSubmit={handleSubmit}>
+          <h1>Upload File</h1>
+          <Input type="file" ref={fileInput} onChange={handleFileChange} />
+          <Input
+            type="text"
+            value={filename}
+            onChange={(e) => setFilename(e.target.value)}
+            placeholder="Filename"
+          />
+          <Button type="submit">Upload File</Button>
+        </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
-

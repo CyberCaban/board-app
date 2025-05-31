@@ -1,6 +1,9 @@
 "use client";
 import { useState } from "react";
 import { useUserStore } from "@/providers/userProvider";
+import { Label } from "../ui/label";
+import { Input } from "../ui/input";
+import { Button } from "../ui/button";
 
 export default function RegisterForm() {
   const [username, setUsername] = useState("");
@@ -16,8 +19,8 @@ export default function RegisterForm() {
   return (
     <form onSubmit={register}>
       <h1>Register</h1>
-      <label htmlFor="registerUsername">Username</label>
-      <input
+      <Label htmlFor="registerUsername">Username</Label>
+      <Input
         type="text"
         name="registerUsername"
         id="registerUsername"
@@ -25,8 +28,8 @@ export default function RegisterForm() {
         value={username}
         onChange={(e) => setUsername(e.target.value)}
       />
-      <label htmlFor="loginEmail">Email</label>
-      <input
+      <Label htmlFor="loginEmail">Email</Label>
+      <Input
         type="email"
         name="loginEmail"
         id="loginEmail"
@@ -34,8 +37,8 @@ export default function RegisterForm() {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
       />
-      <label htmlFor="registerPassword">Password</label>
-      <input
+      <Label htmlFor="registerPassword">Password</Label>
+      <Input
         type="password"
         name="registerPassword"
         id="registerPassword"
@@ -43,7 +46,7 @@ export default function RegisterForm() {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
       />
-      <button type="submit">Register</button>
+      <Button type="submit">Register</Button>
     </form>
   );
 }
