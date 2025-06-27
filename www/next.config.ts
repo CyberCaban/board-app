@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
         basePath: false,
       },
       {
-        source: "/uploads/:path*",
+        source: "/u/:path*",
         destination: `${api_url}/uploads/:path*`,
         basePath: false,
       },

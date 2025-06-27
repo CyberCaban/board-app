@@ -43,7 +43,7 @@ export default function KanbanCard({
       <div className="mr-4 flex flex-col overflow-hidden">
         {card.cover_attachment && isImage(card.cover_attachment) && (
           <Image
-            src={`/uploads/${card.cover_attachment}`}
+            src={`/u/${card.cover_attachment}`}
             alt={card.name}
             width={400}
             height={200}

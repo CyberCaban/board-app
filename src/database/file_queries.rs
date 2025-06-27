@@ -86,6 +86,7 @@ impl FileQueries {
         })
         .await
     }
+
     pub async fn load_private_files(
         db: &Db,
         user_id: Uuid,
@@ -94,6 +95,18 @@ impl FileQueries {
             files::table
                 .filter(files::private.eq(false).or(files::user_id.eq(user_id)))
                 .load::<UploadedFile>(conn)
+        })
+        .await
+    }
+
+    pub async fn load_file_by_id(
+        db: &Db,
+        file_id: Uuid,
+    ) -> Result<UploadedFile, diesel::result::Error> {
+        db.run(move |conn| {
+            files::table
+                .filter(files::user_id.eq(file_id))
+                .first::<UploadedFile>(conn)
         })
         .await
     }

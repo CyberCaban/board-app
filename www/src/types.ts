@@ -1,7 +1,14 @@
+// Type for describing file row from backend
 export interface IFile {
   id: string;
   name: string;
   private: boolean;
+  user_id: string;
+}
+
+// Interface for describing object that get passed to ImagesMasonry
+export interface IFileView {
+  url: string;
   user_id: string;
 }
 

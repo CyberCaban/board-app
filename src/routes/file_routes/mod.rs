@@ -1,9 +1,10 @@
 use rocket::form::Form;
 use serde_json::{json, Value};
+use uuid::Uuid;
 
 use crate::database::file_queries::FileQueries;
 use crate::database::Db;
-use crate::errors::ApiErrorType;
+use crate::errors::{ApiError, ApiErrorType};
 use crate::models::api_response::ApiResponse;
 use crate::models::auth::AuthResult;
 use crate::models::file::UploadRequest;
@@ -59,6 +60,21 @@ pub async fn api_get_files(db: Db, auth: AuthResult) -> Result<ApiResponse<Value
     let uploader_id = auth.unpack()?.id;
     match FileQueries::load_private_files(&db, uploader_id).await {
         Ok(files) => Ok(ApiResponse::new(json!(files))),
+        Err(e) => Err(ApiResponse::from_error(e.into())),
+    }
+}
+
+#[get("/file/<file_id>")]
+pub async fn api_get_file(
+    db: Db,
+    // auth: AuthResult,
+    file_id: String,
+) -> Result<ApiResponse<Value>, ApiResponse> {
+    // let _ = auth.unpack()?;
+    let file_id = Uuid::try_parse(&file_id)
+        .map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))?;
+    match FileQueries::load_file_by_id(&db, file_id).await {
+        Ok(file) => Ok(ApiResponse::new(json!(file))),
         Err(e) => Err(ApiResponse::from_error(e.into())),
     }
 }
