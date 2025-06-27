@@ -8,7 +8,7 @@ export default function CardPage(props: { params: Params }) {
   const { id, card_id } = use(props.params);
 
   return (
-    <Modal>
+    <Modal title="Edit card" headerDesc="Change card and hit save button">
       <EditCard board_id={id} card_id={card_id} />
     </Modal>
   );

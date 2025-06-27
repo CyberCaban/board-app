@@ -9,26 +9,39 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
+import React from "react";
 
-export default function Modal({ children }: { children: React.ReactNode }) {
+interface ModalProps {
+  children: React.ReactNode;
+  title?: React.ReactNode;
+  headerDesc?: React.ReactNode;
+  footerDesc?: React.ReactNode;
+}
+
+export default function Modal({
+  children,
+  title,
+  headerDesc,
+  footerDesc,
+}: ModalProps) {
   const router = useRouter();
   const handleOpenChange = () => {
     router.back();
   };
   return (
     <Dialog defaultOpen open onOpenChange={handleOpenChange}>
-      <DialogOverlay className="bg-black/20">
-        <DialogContent className="overflow-y-hidden bg-black">
+      <DialogOverlay className="bg-background/20 text-foreground">
+        <DialogContent className="overflow-y-hidden bg-background">
           <DialogHeader>
-            <DialogTitle>Change your card</DialogTitle>
-            <DialogDescription>
-              Anyone who has this link will be able to view this.
-            </DialogDescription>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>{headerDesc}</DialogDescription>
           </DialogHeader>
           {children}
-          <DialogDescription className="text-center">
-            Press escape key to close
-          </DialogDescription>
+          {footerDesc ? (
+            <DialogDescription className="text-center">
+              {footerDesc}
+            </DialogDescription>
+          ) : null}
         </DialogContent>
       </DialogOverlay>
     </Dialog>
