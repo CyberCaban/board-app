@@ -1,6 +1,25 @@
 version: '3.9'
 
 services:
+  rabbitmq:
+    build: 
+      context: .
+      dockerfile: Dockerfile.rmq
+    container_name: rabbitmq
+    ports:
+      - "5552:5552"
+      - "15672:15672"
+      - "5672:5672"
+    volumes:
+      - rmq-vol:/var/lib/rabbitmq
+    environment:
+      - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbitmq_stream advertised_host localhost
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 5s
+      timeout: 30s
+      retries: 5
+
   prometheus:
     build: metrics/prometheus
     ports:
@@ -89,6 +108,7 @@ services:
       - "work_mem=16MB"
 
 volumes:
+  rmq-vol: {}
   grafana_data: {}
   metrics-data: {}
   postgres-data:

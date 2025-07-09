@@ -1,5 +1,6 @@
-use rocket::{fs::FileServer, Build, Rocket};
+use rocket::{fairing::AdHoc, fs::FileServer, Build, Rocket};
 
+use crate::models::rmq_stream::RmqStream;
 use crate::models::ws_state::WsState;
 
 use super::{
@@ -79,6 +80,12 @@ impl AuthorizationRoutes for Rocket<Build> {
     fn manage_state(self) -> Self {
         let ws_state = WsState::new();
         self.manage(ws_state)
+    }
+
+    async fn manage_rmq_stream(self) -> Self {
+        let stream_name = "ampq";
+        let producer = RmqStream::new_atomic(stream_name).await;
+        self.manage(producer)
     }
 
     fn mount_uploads(self) -> Self {

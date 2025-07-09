@@ -7,10 +7,10 @@ mod catchers;
 mod config;
 mod database;
 mod errors;
+mod jwt;
 mod models;
 mod routes;
 mod schema;
-mod jwt;
 
 #[macro_use]
 extern crate rocket;
@@ -27,6 +27,8 @@ async fn main() -> Result<(), rocket::Error> {
         .mount_board_routes()
         .manage_state()
         .mount_metrics()
+        .manage_rmq_stream()
+        .await
         .launch()
         .await?;
 

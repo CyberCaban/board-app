@@ -9,6 +9,7 @@ pub mod auth;
 pub mod file;
 pub mod friends;
 pub mod messages;
+pub mod rmq_stream;
 pub mod user;
 pub mod ws_state;
 
