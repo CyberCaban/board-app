@@ -24,27 +24,27 @@ impl UploadedFile {
         let mut file = file.open().await.unwrap();
         let mut buf = Vec::new();
         let UploadedFile {
-            id,
+            id: _id,
             name,
             user_id,
             private,
         } = self;
         file.read_to_end(&mut buf).await.unwrap();
         let file_path = if *private {
-            format!("tmp/{}/{}", user_id, name)
+            format!("tmp/{user_id}/{name}")
         } else {
-            format!("tmp/{}", name)
+            format!("tmp/{name}")
         };
         if *private {
-            std::fs::create_dir_all(format!("tmp/{}", user_id)).unwrap();
+            std::fs::create_dir_all(format!("tmp/{user_id}")).unwrap();
         }
         std::fs::write(file_path, buf).unwrap();
     }
     pub async fn delete_file_from_disk(&self, file_name: String, uploader_id: Uuid) {
         let file_path = if self.private {
-            format!("tmp/{}/{}", uploader_id, file_name)
+            format!("tmp/{uploader_id}/{file_name}")
         } else {
-            format!("tmp/{}", file_name)
+            format!("tmp/{file_name}")
         };
         std::fs::remove_file(file_path).unwrap();
     }

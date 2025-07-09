@@ -108,7 +108,7 @@ impl WsState {
         self.connections
             .write()
             .await
-            .insert(member_id.clone(), Connection { sender: member });
+            .insert(*member_id, Connection { sender: member });
     }
 
     pub async fn add_to_conversation(&self, conv_id: &Uuid, member_id: &Uuid) {

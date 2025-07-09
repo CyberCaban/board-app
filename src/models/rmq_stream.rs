@@ -3,11 +3,12 @@ use std::{sync::Arc, time::Duration};
 use rabbitmq_stream_client::{
     error::StreamCreateError,
     types::{Message, ResponseCode},
-    NoDedup, Producer,
+    Consumer, NoDedup, Producer,
 };
 
 pub struct RmqStream {
     producer: Producer<NoDedup>,
+    consumer: Consumer,
 }
 
 impl RmqStream {
@@ -38,7 +39,14 @@ impl RmqStream {
             .build(stream)
             .await
             .expect("Failed to create producer");
-        Self { producer }
+        let consumer = environment
+            .consumer()
+            .offset(rabbitmq_stream_client::types::OffsetSpecification::First)
+            .build(stream)
+            .await
+            .expect("Failed to create consumer");
+
+        Self { producer, consumer }
     }
 
     pub async fn new_atomic(stream: &str) -> Arc<Self> {

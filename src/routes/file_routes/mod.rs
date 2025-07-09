@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use rocket::form::Form;
+use rocket::response::stream::{Event, EventStream};
+use rocket::tokio::time::{interval, Duration};
 use rocket::State;
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -85,4 +87,13 @@ pub async fn api_get_file(
         Ok(file) => Ok(ApiResponse::new(json!(file))),
         Err(e) => Err(ApiResponse::from_error(e.into())),
     }
+}
+
+#[get("/update_stream")]
+pub fn api_update_stream() -> EventStream![] {
+    let stream = EventStream! {
+        yield Event::data("hello");
+    };
+
+    stream.heartbeat(Duration::from_secs(1))
 }

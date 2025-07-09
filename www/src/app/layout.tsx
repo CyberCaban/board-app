@@ -5,6 +5,7 @@ import { UserStoreProvider } from "@/providers/userProvider";
 import { Toaster } from "sonner";
 import Navbar from "@/components/Navbar";
 import { ThemeProvider } from "next-themes";
+import { EventStreamProvider } from "@/providers/EventStreamContext";
 
 const geistMono = localFont({
   src: "./fonts/GeistMonoVF.woff",
@@ -27,14 +28,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistMono.variable} ${geistMono.className} bg-background text-foreground`}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-          <UserStoreProvider>
+        {/* <ThemeProvider attribute="class" defaultTheme="dark" enableSystem> */}
+        <UserStoreProvider>
+          <EventStreamProvider>
             <Navbar />
             {children}
             {modal}
-          </UserStoreProvider>
-          <Toaster />
-        </ThemeProvider>
+          </EventStreamProvider>
+        </UserStoreProvider>
+        <Toaster />
+        {/* </ThemeProvider> */}
       </body>
     </html>
   );
