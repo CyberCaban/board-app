@@ -1,7 +1,7 @@
 "use client";
 
 import { useUserStore } from "@/providers/userProvider";
-import { getData, postData } from "@/utils/utils";
+import { getData } from "@/utils/utils";
 import { Centrifuge, type Subscription } from "centrifuge";
 import {
   createContext,
@@ -12,6 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { toast } from "sonner";
 
 type ConnectionState = "disconnected" | "connecting" | "connected";
 
@@ -191,7 +192,27 @@ export function CentrifugoProvider({
     if (connectionState === "connected") {
       subscribe("chat#" + userId, {
         onSubscribed: () => {
-          console.log("Received publication on user channel: 'chat#" + userId + "'");
+          console.log(
+            "Received publication on user channel: 'chat#" + userId + "'",
+          );
+        },
+        onPublication: (data) => {
+          const { message, sender } = data as {
+            message: unknown;
+            sender?: string;
+          };
+          console.log(
+            "Received publication on user channel: 'chat#" + userId + "'",
+            message,
+          );
+          toast.message(
+            <span className="text-xl text-background">
+              {sender}: {message["content"]}
+            </span>,
+            {
+              duration: 10000,
+            },
+          );
         },
         onError: () => {
           disconnect();

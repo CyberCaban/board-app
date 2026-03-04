@@ -1,4 +1,5 @@
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/CyberCaban/board-app)
+
 <p align="center">
     <h1 align="center">Web App</h1>
     <p align="center">
@@ -27,6 +28,11 @@
 - Friend system with friend codes
 - Public/private files separation (Anyone can see pulic files but only uploader can see private files)
 - Docker containerization
+
+## TODO
+
+- Use kafka for chat messages
+  - Upon getting message on server send it to kafka topic, then pick message from centrifugo and from frontend
 
 ## Usage
 
