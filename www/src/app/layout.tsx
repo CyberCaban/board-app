@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { UserStoreProvider } from "@/providers/userProvider";
+import { CentrifugoProvider } from "@/providers/centrifugoProvider";
 import { Toaster } from "sonner";
 import Navbar from "@/components/Navbar";
 import { ThemeProvider } from "next-themes";
@@ -29,9 +30,11 @@ export default function RootLayout({
       <body className={`${geistMono.variable} ${geistMono.className} bg-background text-foreground`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           <UserStoreProvider>
-            <Navbar />
-            {children}
-            {modal}
+            <CentrifugoProvider>
+              <Navbar />
+              {children}
+              {modal}
+            </CentrifugoProvider>
           </UserStoreProvider>
           <Toaster />
         </ThemeProvider>

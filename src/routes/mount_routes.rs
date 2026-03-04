@@ -23,6 +23,7 @@ impl AuthorizationRoutes for Rocket<Build> {
                 routes::api_get_user,
                 routes::api_get_users,
                 routes::toro,
+                routes::api_centrifugo_connect,
                 auth_routes::api_register,
                 auth_routes::api_login,
                 auth_routes::api_logout,

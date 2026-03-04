@@ -1,5 +1,8 @@
+use chrono::Utc;
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
+use jwt::{EncodingKey, Header};
 use rocket::response::content::RawHtml;
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::database::Db;
@@ -8,6 +11,18 @@ use crate::models::api_response::ApiResponse;
 use crate::models::auth::AuthResult;
 use crate::models::user::{PubUser, User};
 use crate::schema::users;
+
+#[derive(Serialize)]
+pub struct CentrifugoConnectClaims {
+    sub: String,
+    iat: usize,
+    exp: usize,
+}
+
+#[derive(Serialize)]
+pub struct CentrifugoConnectResponse {
+    token: String,
+}
 
 #[get("/user")]
 pub async fn api_get_self(db: Db, auth: AuthResult) -> Result<ApiResponse<PubUser>, ApiResponse> {
@@ -52,6 +67,31 @@ pub async fn api_get_user(db: Db, user_id: String) -> Result<ApiResponse<PubUser
         Ok(user) => Ok(ApiResponse::new(user.into())),
         Err(e) => Err(ApiResponse::from_error(e.into())),
     }
+}
+
+#[get("/centrifugo/connect")]
+pub async fn api_centrifugo_connect(
+    auth: AuthResult,
+) -> Result<ApiResponse<CentrifugoConnectResponse>, ApiResponse> {
+    let auth = auth.unpack()?;
+    let now = Utc::now().timestamp() as usize;
+    let claims = CentrifugoConnectClaims {
+        sub: auth.id.to_string(),
+        iat: now,
+        exp: now + 60 * 60,
+    };
+
+    let centrifugo_secret =
+        std::env::var("CENTRIFUGO_HMAC_SECRET_KEY").unwrap_or_else(|_| "secret".to_string());
+
+    let token = jwt::encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(centrifugo_secret.as_bytes()),
+    )
+    .map_err(|e| ApiResponse::from_error(ApiError::from_error(e)))?;
+
+    Ok(ApiResponse::new(CentrifugoConnectResponse { token }))
 }
 
 #[get("/toro", format = "html")]

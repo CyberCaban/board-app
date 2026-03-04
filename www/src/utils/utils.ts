@@ -1,11 +1,12 @@
-export async function postData(url: string, data?: unknown) {
-  return fetch(`${url}`, {
+export async function postData(url: string, data?: unknown, fetchOptions?: RequestInit) {
+  return fetch(`${url}`,  {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${getCookie("token")}`,
     },
     body: JSON.stringify(data),
+    ...fetchOptions,
   })
     .then((response) => response.json())
     .then((res) => {

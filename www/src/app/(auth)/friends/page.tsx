@@ -39,7 +39,7 @@ export default function FriendCodeSection() {
       <div>
         <h3 className="text-lg font-semibold">Your Friend Code</h3>
         <div className="flex gap-2">
-          <Input value={myCode} readOnly className="text-black" />
+          <Input value={myCode} readOnly className="text-foreground" />
           <Button onClick={generateCode}>
             {myCode ? "Refresh Code" : "Generate Code"}
           </Button>
@@ -69,7 +69,7 @@ export default function FriendCodeSection() {
                   alt={friend.username}
                   width={100}
                   height={100}
-                  className="rounded-full transition-all duration-300 group-hover:scale-110"
+                  className="rounded-full transition-all duration-300 bg-primary/20 group-hover:scale-110"
                 />
                 <div className="ml-4 flex flex-col gap-2 text-sm transition-all duration-300">
                   <div>{friend.username}</div>
