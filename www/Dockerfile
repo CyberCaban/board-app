@@ -12,6 +12,8 @@ RUN npm i --force
 
 ARG NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+ARG INTERNAL_API_BASE_URL
+ENV INTERNAL_API_BASE_URL=$INTERNAL_API_BASE_URL
 
 # Copy source code
 COPY . .
@@ -29,6 +31,10 @@ RUN apt-get update && apt-get install -y curl && \
     rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
+
+# ← Добавь эти две строки
+ARG INTERNAL_API_BASE_URL
+ENV INTERNAL_API_BASE_URL=$INTERNAL_API_BASE_URL
 
 # Create a non-root user
 RUN addgroup --system --gid 1001 nodejs

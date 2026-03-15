@@ -1,8 +1,24 @@
 import type { NextConfig } from "next";
 
-// const isProd = process.env.NODE_ENV === "production";
-export const api_url =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+function trimTrailingSlash(url: string) {
+  return url.replace(/\/+$/, "");
+}
+
+function resolveInternalApiUrl() {
+  const rawPublicUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  if (rawPublicUrl && /^https?:\/\//.test(rawPublicUrl)) {
+    return trimTrailingSlash(rawPublicUrl);
+  }
+
+  const rawInternalUrl = process.env.INTERNAL_API_BASE_URL?.trim();
+  if (rawInternalUrl && /^https?:\/\//.test(rawInternalUrl)) {
+    return trimTrailingSlash(rawInternalUrl);
+  }
+
+  return "http://localhost:5000";
+}
+
+export const api_url = resolveInternalApiUrl();
 
 const nextConfig: NextConfig = {
   output: "standalone",

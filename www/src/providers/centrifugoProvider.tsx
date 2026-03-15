@@ -47,7 +47,7 @@ const CentrifugoContext = createContext<CentrifugoContextValue | undefined>(
 function resolveCentrifugoWsUrl() {
   return (
     process.env.NEXT_PUBLIC_CENTRIFUGO_WS_URL?.trim() ||
-    "ws://localhost:8000/connection/websocket"
+    "ws://localhost/connection/websocket"
   );
 }
 

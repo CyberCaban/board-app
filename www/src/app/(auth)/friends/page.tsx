@@ -5,7 +5,6 @@ import { IPubUser } from "@/types";
 import { getData, postData } from "@/utils/utils";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import Image from "next/image";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
