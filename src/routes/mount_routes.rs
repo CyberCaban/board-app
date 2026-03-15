@@ -4,9 +4,9 @@ use crate::models::ws_state::WsState;
 
 use super::{
     auth_routes,
-    board_routes::*,
+    board_routes,
     file_routes, friend_routes, routes,
-    users_interaction::{self, chat::*, conversations::*},
+    users_interaction,
     AuthorizationRoutes,
 };
 
@@ -41,7 +41,11 @@ impl AuthorizationRoutes for Rocket<Build> {
         )
         .mount(
             "/chat_source",
-            routes![last_messages, send_message, get_or_create_conversation,],
+            routes![
+                users_interaction::last_messages,
+                users_interaction::send_message,
+                users_interaction::get_or_create_conversation,
+            ],
         )
     }
 
@@ -49,30 +53,30 @@ impl AuthorizationRoutes for Rocket<Build> {
         self.mount(
             "/boards",
             routes![
-                base_actions::boards_create_board_and_relation,
-                base_actions::boards_get_boards,
-                base_actions::boards_get_board,
-                base_actions::boards_update_board,
-                base_actions::boards_delete_board,
-                column_actions::boards_create_column,
-                column_actions::boards_get_columns,
-                column_actions::boards_get_column,
-                column_actions::boards_update_column,
-                column_actions::boards_delete_column,
-                card_actions::boards_create_card,
-                card_actions::boards_get_cards,
-                card_actions::boards_get_card,
-                card_actions::boards_update_card,
-                card_actions::boards_delete_card,
-                card_actions::boards_reorder_cards,
-                card_editing::boards_get_card_by_id,
-                card_editing::boards_add_attachment_to_card,
-                card_editing::boards_get_attachments_of_card,
-                card_editing::boards_delete_attachment_of_card,
-                collaborator_actions::boards_add_collaborator,
-                collaborator_actions::boards_get_collaborators,
-                collaborator_actions::boards_get_collaborator,
-                collaborator_actions::boards_remove_collaborator,
+                board_routes::boards_create_board_and_relation,
+                board_routes::boards_get_boards,
+                board_routes::boards_get_board,
+                board_routes::boards_update_board,
+                board_routes::boards_delete_board,
+                board_routes::boards_create_column,
+                board_routes::boards_get_columns,
+                board_routes::boards_get_column,
+                board_routes::boards_update_column,
+                board_routes::boards_delete_column,
+                board_routes::boards_create_card,
+                board_routes::boards_get_cards,
+                board_routes::boards_get_card,
+                board_routes::boards_update_card,
+                board_routes::boards_delete_card,
+                board_routes::boards_reorder_cards,
+                board_routes::boards_get_card_by_id,
+                board_routes::boards_add_attachment_to_card,
+                board_routes::boards_get_attachments_of_card,
+                board_routes::boards_delete_attachment_of_card,
+                board_routes::boards_add_collaborator,
+                board_routes::boards_get_collaborators,
+                board_routes::boards_get_collaborator,
+                board_routes::boards_remove_collaborator,
             ],
         )
     }

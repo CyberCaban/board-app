@@ -124,7 +124,15 @@ impl ApiError {
             ApiErrorType::UserNotFound => Status::NotFound,
             ApiErrorType::YouDoNotOwnThisFile => Status::Forbidden,
             ApiErrorType::FailedToParseUUID => Status::BadRequest,
-            _ => Status::InternalServerError,
+            ApiErrorType::FailedToDeleteFile => Status::InternalServerError,
+            ApiErrorType::InvalidUserId => Status::BadRequest,
+            ApiErrorType::InvalidRequest => Status::BadRequest,
+            ApiErrorType::AlreadyFriends => Status::Conflict,
+            ApiErrorType::WrongPassword => Status::Unauthorized,
+            ApiErrorType::EmptyFields => Status::BadRequest,
+            ApiErrorType::UnknownError => Status::InternalServerError,
+            ApiErrorType::InternalServerError => Status::InternalServerError,
+            ApiErrorType::Other(_) => Status::InternalServerError,
         }
     }
 }
