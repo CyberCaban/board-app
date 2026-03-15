@@ -95,13 +95,6 @@ impl ApiError {
             error_msg: error.to_string(),
         }
     }
-    pub fn new(error_type: &str, error_msg: impl ToString) -> Self {
-        eprintln!("Error: {}", &error_msg.to_string());
-        ApiError {
-            error_type: error_type.to_string().clone().into(),
-            error_msg: error_msg.to_string(),
-        }
-    }
     pub fn from_type(error_type: ApiErrorType) -> Self {
         eprintln!("Error: {}", &error_type.to_string());
         let error_msg = error_type.to_string().clone();

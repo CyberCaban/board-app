@@ -24,7 +24,7 @@ impl UploadedFile {
         let mut file = file.open().await.unwrap();
         let mut buf = Vec::new();
         let UploadedFile {
-            id,
+            id: _,
             name,
             user_id,
             private,

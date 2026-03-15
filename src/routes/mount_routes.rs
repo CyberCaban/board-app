@@ -1,12 +1,7 @@
 use rocket::{fs::FileServer, Build, Rocket};
 
-use crate::models::ws_state::WsState;
-
 use super::{
-    auth_routes,
-    board_routes,
-    file_routes, friend_routes, routes,
-    users_interaction,
+    auth_routes, board_routes, file_routes, friend_routes, routes, users_interaction,
     AuthorizationRoutes,
 };
 
@@ -82,8 +77,7 @@ impl AuthorizationRoutes for Rocket<Build> {
     }
 
     fn manage_state(self) -> Self {
-        let ws_state = WsState::new();
-        self.manage(ws_state)
+        self
     }
 
     fn mount_uploads(self) -> Self {

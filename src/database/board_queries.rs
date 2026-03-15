@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use diesel::{
     result::Error as DieselError, BoolExpressionMethods, Connection, ExpressionMethods, QueryDsl,
     RunQueryDsl,
@@ -8,12 +10,12 @@ use uuid::Uuid;
 use crate::{
     database::Db,
     errors::{ApiError, ApiErrorType},
+    models::file::UploadedFile,
     models::{
         auth::Auth, Board, BoardColumn, BoardInfo, BoardUsersRelation, CardInfo, ColumnCard,
         NewBoard, NewCard, NewColumn, PubAttachment, PubBoard, PubCard, PubColumn, ReturnedCard,
         ReturnedColumn, UploadAttachment, SELECT_CARD,
     },
-    models::file::UploadedFile,
     schema::{board_column, board_users_relation, boards, card_attachments, column_card, files},
 };
 
@@ -136,9 +138,9 @@ impl BoardQueries {
         let board_id = parse_uuid(&board_id)?;
 
         db.run(move |conn| {
-            diesel::update(boards::table.filter(
-                boards::id.eq(board_id).and(boards::creator_id.eq(auth.id)),
-            ))
+            diesel::update(
+                boards::table.filter(boards::id.eq(board_id).and(boards::creator_id.eq(auth.id))),
+            )
             .set(boards::name.eq(board_name))
             .returning(boards::id)
             .get_result::<Uuid>(conn)
@@ -152,51 +154,28 @@ impl BoardQueries {
 
         db.run(move |conn| {
             conn.transaction(|conn| {
+                ensure_board_creator(conn, board_id, auth.id)?;
+
                 let column_ids = board_column::table
                     .filter(board_column::board_id.eq(board_id))
                     .select(board_column::id)
                     .load::<Uuid>(conn)?;
 
-                for column_id in column_ids {
-                    let cards = column_card::table
-                        .filter(column_card::column_id.eq(column_id))
+                let card_ids = if column_ids.is_empty() {
+                    Vec::new()
+                } else {
+                    column_card::table
+                        .filter(column_card::column_id.eq_any(column_ids))
                         .select(column_card::id)
-                        .load::<Uuid>(conn)?;
+                        .load::<Uuid>(conn)?
+                };
 
-                    for card_id in cards {
-                        let attachments = card_attachments::table
-                            .filter(card_attachments::card_id.eq(card_id))
-                            .inner_join(files::table)
-                            .select((card_attachments::file_id, files::name))
-                            .load::<(Uuid, String)>(conn)?;
-
-                        for (attachment_id, file_name) in attachments {
-                            diesel::delete(card_attachments::table)
-                                .filter(card_attachments::card_id.eq(card_id))
-                                .filter(card_attachments::file_id.eq(attachment_id))
-                                .execute(conn)?;
-                            diesel::delete(files::table)
-                                .filter(files::id.eq(attachment_id))
-                                .execute(conn)?;
-                            std::fs::remove_file(format!("tmp/{}", file_name))
-                                .map_err(map_io_error)?;
-                        }
-                    }
-
-                    diesel::delete(column_card::table)
-                        .filter(column_card::column_id.eq(column_id))
-                        .execute(conn)?;
-                }
-
-                diesel::delete(board_column::table.filter(board_column::board_id.eq(board_id)))
-                    .execute(conn)?;
-                diesel::delete(
-                    board_users_relation::table.filter(board_users_relation::board_id.eq(board_id)),
-                )
-                .execute(conn)?;
+                let attachment_files = load_attachment_files_for_cards(conn, &card_ids)?;
+                delete_files_and_cleanup(conn, attachment_files)?;
 
                 let deleted = diesel::delete(
-                    boards::table.filter(boards::id.eq(board_id).and(boards::creator_id.eq(auth.id))),
+                    boards::table
+                        .filter(boards::id.eq(board_id).and(boards::creator_id.eq(auth.id))),
                 )
                 .returning(boards::id)
                 .get_result::<Uuid>(conn)?;
@@ -339,42 +318,21 @@ impl BoardQueries {
             conn.transaction(|conn| {
                 ensure_board_access(conn, board_id, auth.id)?;
 
-                let cards = column_card::table
+                let card_ids = column_card::table
                     .filter(column_card::column_id.eq(column_id))
-                    .select((column_card::id, column_card::name))
-                    .load::<(Uuid, String)>(conn)
+                    .select(column_card::id)
+                    .load::<Uuid>(conn)
                     .map_err(ApiError::from)?;
 
-                for (card_id, _) in cards {
-                    let attachments = card_attachments::table
-                        .filter(card_attachments::card_id.eq(card_id))
-                        .inner_join(files::table)
-                        .select((card_attachments::file_id, files::name))
-                        .load::<(Uuid, String)>(conn)
-                        .map_err(ApiError::from)?;
-
-                    for (attachment_id, file_name) in attachments {
-                        diesel::delete(card_attachments::table)
-                            .filter(card_attachments::card_id.eq(card_id))
-                            .filter(card_attachments::file_id.eq(attachment_id))
-                            .execute(conn)
-                            .map_err(ApiError::from)?;
-                        diesel::delete(files::table)
-                            .filter(files::id.eq(attachment_id))
-                            .execute(conn)
-                            .map_err(ApiError::from)?;
-                        std::fs::remove_file(format!("tmp/{}", file_name))
-                            .map_err(map_io_error)?;
-                    }
-                }
-
-                diesel::delete(column_card::table)
-                    .filter(column_card::column_id.eq(column_id))
-                    .execute(conn)
-                    .map_err(ApiError::from)?;
+                let attachment_files = load_attachment_files_for_cards(conn, &card_ids)?;
+                delete_files_and_cleanup(conn, attachment_files)?;
 
                 let column = diesel::delete(board_column::table)
-                    .filter(board_column::id.eq(column_id))
+                    .filter(
+                        board_column::id
+                            .eq(column_id)
+                            .and(board_column::board_id.eq(board_id)),
+                    )
                     .returning((board_column::id, board_column::name, board_column::position))
                     .get_result::<ReturnedColumn>(conn)
                     .map_err(ApiError::from)?;
@@ -664,13 +622,21 @@ impl BoardQueries {
                 ensure_board_access(conn, board_id, auth.id)?;
 
                 let column = board_column::table
-                    .filter(board_column::id.eq(column_id))
+                    .filter(
+                        board_column::id
+                            .eq(column_id)
+                            .and(board_column::board_id.eq(board_id)),
+                    )
                     .select(board_column::id)
                     .first::<Uuid>(conn)
                     .map_err(ApiError::from)?;
 
                 let (deleted_card_id, pos) = column_card::table
-                    .filter(column_card::id.eq(card_id))
+                    .filter(
+                        column_card::id
+                            .eq(card_id)
+                            .and(column_card::column_id.eq(column)),
+                    )
                     .select((column_card::id, column_card::position))
                     .first::<(Uuid, i32)>(conn)
                     .map_err(ApiError::from)?;
@@ -685,26 +651,8 @@ impl BoardQueries {
                     .execute(conn)
                     .map_err(ApiError::from)?;
 
-                let attachments = card_attachments::table
-                    .filter(card_attachments::card_id.eq(deleted_card_id))
-                    .inner_join(files::table)
-                    .select((card_attachments::file_id, files::name))
-                    .load::<(Uuid, String)>(conn)
-                    .map_err(ApiError::from)?;
-
-                for (attachment_id, file_name) in attachments {
-                    diesel::delete(card_attachments::table)
-                        .filter(card_attachments::card_id.eq(deleted_card_id))
-                        .filter(card_attachments::file_id.eq(attachment_id))
-                        .execute(conn)
-                        .map_err(ApiError::from)?;
-                    diesel::delete(files::table)
-                        .filter(files::id.eq(attachment_id))
-                        .execute(conn)
-                        .map_err(ApiError::from)?;
-                    std::fs::remove_file(format!("tmp/{}", file_name))
-                        .map_err(map_io_error)?;
-                }
+                let attachments = load_attachment_files_for_cards(conn, &[deleted_card_id])?;
+                delete_files_and_cleanup(conn, attachments)?;
 
                 let deleted = diesel::delete(column_card::table)
                     .filter(
@@ -885,19 +833,20 @@ impl BoardQueries {
                     .first::<(Uuid, Option<String>)>(conn)
                     .map_err(ApiError::from)?;
 
-                diesel::delete(card_attachments::table)
+                let file_name = card_attachments::table
                     .filter(card_attachments::card_id.eq(card_id))
                     .filter(card_attachments::file_id.eq(attachment_id))
-                    .execute(conn)
-                    .map_err(ApiError::from)?;
-
-                let file_name = diesel::delete(files::table)
-                    .filter(files::id.eq(attachment_id))
-                    .returning(files::name)
+                    .inner_join(files::table)
+                    .select(files::name)
                     .get_result::<String>(conn)
                     .map_err(ApiError::from)?;
 
-                if cover.is_some() {
+                diesel::delete(files::table)
+                    .filter(files::id.eq(attachment_id))
+                    .execute(conn)
+                    .map_err(ApiError::from)?;
+
+                if cover.as_deref() == Some(file_name.as_str()) {
                     diesel::update(column_card::table)
                         .filter(column_card::id.eq(card_id))
                         .set(column_card::cover_attachment.eq(None::<String>))
@@ -1049,6 +998,44 @@ fn ensure_board_creator(
 
 fn parse_uuid(value: &str) -> Result<Uuid, ApiError> {
     Uuid::try_parse(value).map_err(|_| ApiError::from_type(ApiErrorType::FailedToParseUUID))
+}
+
+fn load_attachment_files_for_cards(
+    conn: &mut diesel::PgConnection,
+    card_ids: &[Uuid],
+) -> Result<Vec<(Uuid, String)>, ApiError> {
+    if card_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    card_attachments::table
+        .filter(card_attachments::card_id.eq_any(card_ids))
+        .inner_join(files::table)
+        .select((files::id, files::name))
+        .load::<(Uuid, String)>(conn)
+        .map_err(ApiError::from)
+}
+
+fn delete_files_and_cleanup(
+    conn: &mut diesel::PgConnection,
+    attachments: Vec<(Uuid, String)>,
+) -> Result<(), ApiError> {
+    if attachments.is_empty() {
+        return Ok(());
+    }
+
+    let attachment_map = attachments.into_iter().collect::<HashMap<Uuid, String>>();
+    let file_ids = attachment_map.keys().copied().collect::<Vec<_>>();
+
+    diesel::delete(files::table.filter(files::id.eq_any(file_ids)))
+        .execute(conn)
+        .map_err(ApiError::from)?;
+
+    for file_name in attachment_map.into_values() {
+        std::fs::remove_file(format!("tmp/{}", file_name)).map_err(map_io_error)?;
+    }
+
+    Ok(())
 }
 
 fn to_pub_card(card: ReturnedCard) -> PubCard {

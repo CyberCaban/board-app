@@ -10,7 +10,6 @@ pub mod file;
 pub mod friends;
 pub mod messages;
 pub mod user;
-pub mod ws_state;
 
 #[derive(Serialize, Deserialize)]
 pub struct PubBoard {
