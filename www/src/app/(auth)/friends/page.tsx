@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
 import Link from "next/link";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function FriendCodeSection() {
   const [code, setCode] = useState("");
@@ -64,13 +65,17 @@ export default function FriendCodeSection() {
           {friends.map((friend) => (
             <Link key={friend.id} href={`/chat/${friend.id}`}>
               <div className="group flex flex-row items-center gap-2 rounded-md p-4 hover:bg-primary/20">
-                <Image
-                  src={friend.profile_url}
-                  alt={friend.username}
-                  width={100}
-                  height={100}
-                  className="rounded-full transition-all duration-300 bg-primary/20 group-hover:scale-110"
-                />
+                <Avatar size="xl">
+                  <AvatarImage
+                    src={friend.profile_url}
+                    alt={friend.username}
+                    width={100}
+                    height={100}
+                    className="rounded-full bg-primary/20 transition-all duration-300 group-hover:scale-110"
+                  />
+                  <AvatarFallback>{friend.username[0]}</AvatarFallback>
+                </Avatar>
+
                 <div className="ml-4 flex flex-col gap-2 text-sm transition-all duration-300">
                   <div>{friend.username}</div>
                   <div>{friend.bio}</div>

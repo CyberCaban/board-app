@@ -41,12 +41,7 @@ impl AuthorizationRoutes for Rocket<Build> {
         )
         .mount(
             "/chat_source",
-            routes![
-                events,
-                last_messages,
-                send_message,
-                get_or_create_conversation,
-            ],
+            routes![last_messages, send_message, get_or_create_conversation,],
         )
     }
 

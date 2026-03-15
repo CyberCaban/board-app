@@ -1,4 +1,10 @@
-import { IConversation, IMember, IMessage, SearchState } from "@/types";
+import {
+  IConversation,
+  IMember,
+  IMessage,
+  intoIMessage,
+  SearchState,
+} from "@/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChatHeader } from "./ChatHeader";
 import { SearchPanel } from "./SearchPanel";
@@ -10,10 +16,12 @@ import {
   findConversation,
   getLastMessages,
 } from "@/app/(chat)/chat/[id]/conversation";
-import { getCookie, postData } from "@/utils/utils";
+import { postData } from "@/utils/utils";
+import { useCentrifugo } from "@/providers/centrifugoProvider";
 
 export default function Chat({ receiver_id }: { receiver_id: string }) {
   const [store] = useUserStore((s) => s);
+  const { addMessageListener } = useCentrifugo();
   const [messages, setMessages] = useState<IMessage[]>([]);
 
   const [, setFileId] = useState("");
@@ -29,7 +37,6 @@ export default function Chat({ receiver_id }: { receiver_id: string }) {
 
   const [conversation, setConversation] = useState<IConversation | null>(null);
   const [members, setMembers] = useState<IMember[]>([]);
-  const ws = useRef<WebSocket | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -59,29 +66,12 @@ export default function Chat({ receiver_id }: { receiver_id: string }) {
     getLastMessages(conversation.id).then((res: IMessage[]) => {
       setMessages(res.toReversed());
     });
-    ws.current = new WebSocket(`/chat_source/events`);
-
-    const handshake = {
-      token: getCookie("token") || "",
-      conversation_id: conversation.id,
-    };
-    ws.current.addEventListener("open", () => {
-      ws.current?.send(JSON.stringify(handshake));
-    });
-    ws.current.addEventListener("message", (e) => {
-      const data = JSON.parse(e.data);
-      if (data.message) {
-        console.log(data.message);
-      } else setMessages((prev) => [...prev, data]);
-    });
-    ws.current.addEventListener("close", (e) => {
-      console.error("ws closed", e);
+    const removeListener = addMessageListener((message) => {
+      setMessages((prev) => [...prev, intoIMessage(message)]);
     });
 
     return () => {
-      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-        ws.current.close();
-      }
+      removeListener();
     };
   }, [conversation]);
 
@@ -93,7 +83,6 @@ export default function Chat({ receiver_id }: { receiver_id: string }) {
       created_at: Date.now(),
       file_id: null,
     };
-    // ws.current?.send(JSON.stringify(msg));
     postData("/chat_source/message", msg).catch((err) => {
       console.error("Failed to send message:", err);
     });

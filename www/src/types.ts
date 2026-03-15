@@ -84,3 +84,30 @@ export interface SearchState {
   results: number[];
   currentIndex: number;
 }
+
+export type IncomingMessage = {
+  message: {
+    content: string;
+    conversation_id: string;
+    created_at: string;
+    deleted: boolean;
+    file_id: string | null;
+    id: string;
+    sender_id: string;
+    updated_at: string;
+  };
+  sender: string;
+};
+
+export function intoIMessage(incomingMessage: IncomingMessage): IMessage {
+  const { message } = incomingMessage;
+  return {
+    id: message.id,
+    content: message.content,
+    sender_id: message.sender_id,
+    conversation_id: message.conversation_id,
+    created_at: new Date(message.created_at).getTime(),
+  };
+}
+
+export type MessageListener = (message: IncomingMessage) => void;

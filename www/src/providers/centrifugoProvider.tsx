@@ -1,6 +1,7 @@
 "use client";
 
 import { useUserStore } from "@/providers/userProvider";
+import { IncomingMessage, MessageListener } from "@/types";
 import { getData } from "@/utils/utils";
 import { Centrifuge, type Subscription } from "centrifuge";
 import {
@@ -36,6 +37,7 @@ type CentrifugoContextValue = {
     channel: string,
     handlers?: SubscribeHandlers<T>,
   ) => (() => void) | null;
+  addMessageListener: (listener: MessageListener) => () => void;
 };
 
 const CentrifugoContext = createContext<CentrifugoContextValue | undefined>(
@@ -61,6 +63,7 @@ export function CentrifugoProvider({
   const tokenRef = useRef("");
   const connectionStateRef = useRef<ConnectionState>("disconnected");
   const connectPromiseRef = useRef<Promise<Centrifuge> | null>(null);
+  const listenersRefs = useRef(new Set<MessageListener>());
 
   const updateConnectionState = useCallback((state: ConnectionState) => {
     connectionStateRef.current = state;
@@ -187,6 +190,11 @@ export function CentrifugoProvider({
     });
   }, [connect, disconnect, updateConnectionState, userId]);
 
+  const addMessageListener = useCallback((listener: MessageListener) => {
+    listenersRefs.current.add(listener);
+    return () => listenersRefs.current.delete(listener);
+  }, []);
+
   // Subscribe to user-specific channel after successful connection
   useEffect(() => {
     if (connectionState === "connected") {
@@ -197,26 +205,22 @@ export function CentrifugoProvider({
           );
         },
         onPublication: (data) => {
-          const { message, sender } = data as {
-            message: unknown;
-            sender?: string;
-          };
-          console.log(
-            "Received publication on user channel: 'chat#" + userId + "'",
-            message,
-          );
-          toast.message(
-            <span className="text-xl text-background">
-              {sender}: {message["content"]}
-            </span>,
-            {
-              duration: 10000,
-            },
-          );
+          const payload = data as unknown as IncomingMessage;
+          listenersRefs.current.forEach((listener) => {
+            listener(payload);
+          });
         },
         onError: () => {
           disconnect();
         },
+      });
+
+      // Toast notification
+      addMessageListener((message) => {
+        // Assuming you have a toast function available
+        if (!window.location.pathname.includes("/chat")) {
+          toast.success(`${message.sender}: ${message.message.content}`);
+        }
       });
     }
   }, [connectionState, subscribe, disconnect, userId]);
@@ -234,8 +238,16 @@ export function CentrifugoProvider({
       disconnect,
       getClient,
       subscribe,
+      addMessageListener,
     }),
-    [connect, connectionState, disconnect, getClient, subscribe],
+    [
+      connect,
+      connectionState,
+      disconnect,
+      getClient,
+      subscribe,
+      addMessageListener,
+    ],
   );
 
   return (
