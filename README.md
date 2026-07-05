@@ -1,99 +1,85 @@
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/CyberCaban/board-app)
+# Web App
 
-<p align="center">
-    <h1 align="center">Web App</h1>
-    <p align="center">
-        Web file server with authentication. 
-    </p>
-</p>
+Комплексное веб-приложение, сочетающее функционал визуальной галереи, системы управления проектами и сервиса обмена сообщениями в реальном времени.
 
-## Made with
+## Функциональные возможности
 
-- Rust, a systems programming language.
-- Diesel, a safe, extensible ORM and query builder.
-- Rocket, a web framework for building web applications.
-- PostgreSQL, a powerful, open source object-relational database system.
-- Docker, a platform for containerizing and deploying applications.
-- React, a JavaScript library for building user interfaces.
-- Tailwind CSS, a utility-first CSS framework for building custom user interfaces.
+### Визуальная галерея
+*   Система загрузки и хранения графических файлов.
+*   Отображение контента в виде адаптивной сетки (аналог Pinterest).
+*   Разграничение прав доступа: поддержка публичных и приватных файлов.
 
-## Features
+### Управление проектами
+*   Организация рабочих процессов на базе досок, колонок и карточек (аналог Trello).
+*   Механизм совместной работы с добавлением коллабораторов.
+*   Поддержка вложений для карточек задач.
+*   Функционал изменения приоритетов и порядка карточек.
 
-- Authentication (username/password)
-- File upload
-- File download
-- File deletion
-- Realtime chat
-- JWT token authentication
-- Friend system with friend codes
-- Public/private files separation (Anyone can see pulic files but only uploader can see private files)
-- Docker containerization
+### Социальное взаимодействие и чат
+*   Обмен сообщениями в реальном времени через интеграцию с Centrifugo.
+*   Система управления контактами и поиск пользователей по уникальным кодам.
+*   Безопасная аутентификация на основе JWT (Registration, Login, Logout).
 
-## TODO
+### Мониторинг и инфраструктура
+*   Сбор технических метрик приложения через Prometheus.
+*   Визуализация состояния системы и дашборды в Grafana.
+*   Полная контейнеризация компонентов для развертывания в Docker-окружении.
 
-- Use kafka for chat messages
-  - Upon getting message on server send it to kafka topic, then pick message from centrifugo and from frontend
+## Технологический стек
 
-## Usage
+### Backend
+*   **Rust (Rocket):** основной веб-фреймворк.
+*   **Diesel:** ORM для работы с PostgreSQL.
+*   **PostgreSQL:** реляционная база данных.
+*   **Centrifugo:** Real-time сервер обмена сообщениями.
 
-Prerequisites:
+### Frontend
+*   **Next.js:** фреймворк на базе React для построения пользовательского интерфейса.
+*   **Tailwind CSS:** утилитарный CSS-фреймворк.
+*   **Radix UI:** библиотека компонентов интерфейса.
 
-- [PostgreSQL](https://www.postgresql.org) (libpq-dev)
-- [Rust](https://www.rust-lang.org/tools/install)
-- [Node.js](https://nodejs.org/en/)
-- [Docker](https://www.docker.com) (optional)
+### Инфраструктура
+*   **Docker / Docker Compose:** оркестрация контейнеров.
+*   **Prometheus / Grafana:** мониторинг и визуализация данных.
+*   **Nginx:** обратный прокси-сервер.
 
-### With Docker
+## Развертывание и запуск
 
-```bash
-docker-compose up
-```
+### Использование Docker
 
-You can now access the server at http://localhost:3000
-
-### Without Docker
-
-1. Create .env file with .env.local as example and put your database credentials there. It should look like this:
-
-```env
-PORT=8080 # required
-ROCKET_ADDRESS=0.0.0.0 # required do not use 127.0.0.1
-DATABASE_URL=postgres://username:password@localhost:5432/database_name # required
-```
-
-2. You should run the database server
-
-3. Run database migrations
+Для запуска всех компонентов системы (Backend, Frontend, БД, Centrifugo, Prometheus, Grafana) выполните команду:
 
 ```bash
-cargo install diesel_cli --no-default-features --features postgres
-diesel migration run
+docker-compose up --build
 ```
 
-4. Build frontend inside the `www` folder:
+После завершения инициализации приложение будет доступно по адресу: `http://localhost`
 
+### Локальный запуск (разработка)
+
+#### Требования
+*   PostgreSQL
+*   Rust
+*   Node.js (или Bun)
+
+#### 1. База данных
+*   Создайте файл `.env` на основе примера `.env.local`.
+*   Выполните миграции:
+    ```bash
+    cargo install diesel_cli --no-default-features --features postgres
+    diesel migration run
+    ```
+
+#### 2. Запуск Backend-сервера
+```bash
+cargo run
+```
+По умолчанию сервер принимает соединения на порту 5000.
+
+#### 3. Запуск Frontend-клиента
 ```bash
 cd www
 npm install
-npm run build
+npm run dev
 ```
-
-5. Start the server:
-
-```bash
-cargo run --release
-```
-
-You can now access the server at http://localhost:PORT where PORT is the port you specified in .env file.
-
-## References
-
-- [Docker](https://www.docker.com)
-- [Rust](https://www.rust-lang.org)
-- [Node.js](https://nodejs.org/en/)
-- [PostgreSQL](https://www.postgresql.org)
-- [Rocket](https://rocket.rs)
-- [Diesel](https://diesel.rs)
-- [Tailwind CSS](https://tailwindcss.com)
-- [React](https://reactjs.org)
-- [Vite](https://vitejs.dev)
+Интерфейс будет доступен по адресу: `http://localhost:3000`
